@@ -2,7 +2,9 @@ import { useColorScheme } from "react-native";
 import { Tabs } from "expo-router";
 import { Colors } from "../../constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
+import AntDesign from "@expo/vector-icons/AntDesign";
 import UserOnly from "../../components/auth/UserOnly";
+import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 export default function DashboardLayout() {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme] ?? Colors.light;
@@ -34,26 +36,40 @@ export default function DashboardLayout() {
         />
 
         <Tabs.Screen
-          name='books'
+          name='map'
           options={{
-            title: "Books",
+            title: "G Map",
             tabBarIcon: ({ focused }) => (
               <Ionicons
                 size={24}
-                name={focused ? "book" : "book-outline"}
+                name={focused ? "map" : "map-outline"}
                 color={focused ? theme.iconColorFocused : theme.iconColor}
               />
             ),
           }}
         />
         <Tabs.Screen
-          name='create'
+          name='history'
           options={{
-            title: "Create",
+            title: "History",
             tabBarIcon: ({ focused }) => (
               <Ionicons
                 size={24}
-                name={focused ? "create" : "create-outline"}
+                name={
+                  focused ? (
+                    <FontAwesome5
+                      name='history'
+                      size={24}
+                      color={focused ? theme.iconColorFocused : theme.iconColor}
+                    />
+                  ) : (
+                    <AntDesign
+                      name='history'
+                      size={24}
+                      color={focused ? theme.iconColorFocused : theme.iconColor}
+                    />
+                  )
+                }
                 color={focused ? theme.iconColorFocused : theme.iconColor}
               />
             ),

@@ -1,28 +1,28 @@
 import { StyleSheet } from 'react-native'
 import ThemedView from '../../components/ThemedView'
-import ThemedText from '../../components/ThemedText'
 import Spacer from '../../components/Spacer'
+import ThemedText from '../../components/ThemedText'
 
-const Create = () => {
+const GoogleMap = () => {
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={styles.container} safe={true}>
 
-      <ThemedText title={true} style={styles.heading}>
-        Add a New Book
-      </ThemedText>
       <Spacer />
+      <ThemedText title={true} style={styles.heading}>
+        Render Google Map in future.
+      </ThemedText>
 
     </ThemedView>
   )
 }
 
-export default Create
+export default GoogleMap;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    // justifyContent: "center",
+    alignItems: "stretch",
   },
   heading: {
     fontWeight: "bold",
