@@ -8,7 +8,6 @@ import { UserProvider } from "../contexts/UserContext";
 const RootLayout = () => {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme] ?? Colors.light;
-  console.log("Color Scheme:--->", colorScheme);
 
   return (
     <UserProvider>
