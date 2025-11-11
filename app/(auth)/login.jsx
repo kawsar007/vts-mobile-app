@@ -15,6 +15,7 @@ import ThemedView from "../../components/ThemedView";
 import ThemedText from "../../components/ThemedText";
 import Spacer from "../../components/Spacer";
 import { Link } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import ThemedButton from "../../components/ThemedButton";
 import ThemedTextInput from "../../components/ThemedTextInput";
 import { useUser } from "../../hooks/useUser";
@@ -115,13 +116,15 @@ const Login = () => {
   };
 
   return (
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}>
         <ScrollView
           contentContainerStyle={{ flexGrow: 1 }}
-          keyboardShouldPersistTaps='handled'>
+          keyboardShouldPersistTaps='handled'
+          showsVerticalScrollIndicator={false}>
           <ThemedView style={styles.container}>
             <View style={styles.headerContainer}>
               <ThemedText title={true} style={styles.title}>
@@ -229,12 +232,16 @@ const Login = () => {
         </ScrollView>
       </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
+    </SafeAreaView>
   );
 };
 
 export default Login;
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     justifyContent: "center",
