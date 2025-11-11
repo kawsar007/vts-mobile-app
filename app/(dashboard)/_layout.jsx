@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useColorScheme } from "react-native";
-import { Tabs } from "expo-router";
+import { Tabs, router } from "expo-router";
 import { Colors } from "../../constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import AntDesign from "@expo/vector-icons/AntDesign";
@@ -54,6 +54,15 @@ export default function DashboardLayout() {
     );
   };
 
+  // Handle drawer navigation
+  const handleDrawerNavigation = (route) => {
+    setDrawerVisible(false);
+
+    // Navigate to the route
+    // Adjust the path based on your file structure
+    router.push(`/${route}`);
+  };
+
   // Sample notifications - replace with your actual data
   const notifications = [
     {
@@ -91,18 +100,18 @@ export default function DashboardLayout() {
 
   return (
     <UserOnly>
-      <View
+      <SafeAreaView
         style={[
           styles.container,
           { backgroundColor: isDark ? "#000" : "#fff" },
-        ]}>
+        ]}
+        edges={["top", "bottom"]}>
         <StatusBar
-        
           barStyle={isDark ? "light-content" : "dark-content"}
           backgroundColor={isDark ? "#1a1a1a" : "#ffffff"}
           translucent={false}
         />
-        <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        <View style={styles.safeArea}>
           {/* Top Navigation Bar */}
           <View
             style={[
@@ -207,11 +216,7 @@ export default function DashboardLayout() {
                         styles.drawerItem,
                         { borderBottomColor: isDark ? "#2a2a2a" : "#f0f0f0" },
                       ]}
-                      onPress={() => {
-                        setDrawerVisible(false);
-                        // Handle navigation here
-                        console.log(`Navigate to ${item.route}`);
-                      }}
+                      onPress={() => handleDrawerNavigation(item.route)}
                       activeOpacity={0.7}>
                       <Ionicons
                         name={item.icon}
@@ -376,80 +381,80 @@ export default function DashboardLayout() {
           </Modal>
 
           {/* Bottom Tabs */}
-        </SafeAreaView>
-        <Tabs
-          screenOptions={{
-            headerShown: false,
-            tabBarStyle: {
-              backgroundColor: isDark ? "#1a1a1a" : "#ffffff",
-              borderTopWidth: 1,
-              borderTopColor: isDark ? "#333" : "#e0e0e0",
-              paddingTop: 8,
-              paddingBottom: 8,
-              height: 65,
-              elevation: 8,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: -2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 4,
-            },
-            tabBarActiveTintColor: theme.iconColorFocused,
-            tabBarInactiveTintColor: isDark ? "#6b7280" : "#9ca3af",
-            tabBarLabelStyle: {
-              fontSize: 12,
-              fontWeight: "600",
-              marginTop: 4,
-            },
-          }}>
-          <Tabs.Screen
-            name='profile'
-            options={{
-              title: "Profile",
-              tabBarIcon: ({ focused, color }) => (
-                <View style={focused && styles.activeTabIcon}>
-                  <Ionicons
-                    name={focused ? "person" : "person-outline"}
-                    size={24}
-                    color={color}
-                  />
-                </View>
-              ),
-            }}
-          />
+          <Tabs
+            screenOptions={{
+              headerShown: false,
+              tabBarStyle: {
+                backgroundColor: isDark ? "#1a1a1a" : "#ffffff",
+                borderTopWidth: 1,
+                borderTopColor: isDark ? "#333" : "#e0e0e0",
+                paddingTop: 8,
+                paddingBottom: 8,
+                height: 65,
+                elevation: 8,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: -2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+              },
+              tabBarActiveTintColor: theme.iconColorFocused,
+              tabBarInactiveTintColor: isDark ? "#6b7280" : "#9ca3af",
+              tabBarLabelStyle: {
+                fontSize: 12,
+                fontWeight: "600",
+                marginTop: 4,
+              },
+            }}>
+            <Tabs.Screen
+              name='profile'
+              options={{
+                title: "Profile",
+                tabBarIcon: ({ focused, color }) => (
+                  <View style={focused && styles.activeTabIcon}>
+                    <Ionicons
+                      name={focused ? "person" : "person-outline"}
+                      size={24}
+                      color={color}
+                    />
+                  </View>
+                ),
+              }}
+            />
 
-          <Tabs.Screen
-            name='map'
-            options={{
-              title: "Map",
-              tabBarIcon: ({ focused, color }) => (
-                <View style={focused && styles.activeTabIcon}>
-                  <Ionicons
-                    name={focused ? "map" : "map-outline"}
-                    size={24}
-                    color={color}
-                  />
-                </View>
-              ),
-            }}
-          />
+            <Tabs.Screen
+              name='map'
+              options={{
+                title: "Map",
+                tabBarIcon: ({ focused, color }) => (
+                  <View style={focused && styles.activeTabIcon}>
+                    <Ionicons
+                      name={focused ? "map" : "map-outline"}
+                      size={24}
+                      color={color}
+                    />
+                  </View>
+                ),
+              }}
+            />
 
-          <Tabs.Screen
-            name='history'
-            options={{
-              title: "History",
-              tabBarIcon: ({ focused, color }) => (
-                <View style={focused && styles.activeTabIcon}>
-                  {focused ? (
-                    <FontAwesome5 name='history' size={22} color={color} />
-                  ) : (
-                    <AntDesign name='history' size={24} color={color} />
-                  )}
-                </View>
-              ),
-            }}
-          />
-        </Tabs>
-      </View>
+            <Tabs.Screen
+              name='history'
+              options={{
+                title: "History",
+                tabBarIcon: ({ focused, color }) => (
+                  <View style={focused && styles.activeTabIcon}>
+                    {focused ? (
+                      <FontAwesome5 name='history' size={22} color={color} />
+                    ) : (
+                      <AntDesign name='history' size={24} color={color} />
+                    )}
+                  </View>
+                ),
+              }}
+            />
+          </Tabs>
+        </View>
+      </SafeAreaView>
     </UserOnly>
   );
 }
@@ -459,6 +464,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   safeArea: {
+    flex: 1,
     backgroundColor: "transparent",
   },
   topNav: {
