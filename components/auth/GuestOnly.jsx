@@ -9,7 +9,7 @@ const GuestOnly = ({ children }) => {
   
   useEffect(() => {
     if (authChecked && user !== null) {
-      router.replace("/profile")
+      router.replace("/map")
     }
   }, [user, authChecked])
 
@@ -22,4 +22,4 @@ const GuestOnly = ({ children }) => {
   return children
 }
 
-export default GuestOnly
+export default GuestOnly;

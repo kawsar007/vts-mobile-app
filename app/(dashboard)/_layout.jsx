@@ -404,23 +404,9 @@ export default function DashboardLayout() {
                 fontWeight: "600",
                 marginTop: 4,
               },
-            }}>
-            <Tabs.Screen
-              name='profile'
-              options={{
-                title: "Profile",
-                tabBarIcon: ({ focused, color }) => (
-                  <View style={focused && styles.activeTabIcon}>
-                    <Ionicons
-                      name={focused ? "person" : "person-outline"}
-                      size={24}
-                      color={color}
-                    />
-                  </View>
-                ),
-              }}
-            />
-
+            }}
+            initialRouteName="map"
+            >
             <Tabs.Screen
               name='map'
               options={{
@@ -448,6 +434,22 @@ export default function DashboardLayout() {
                     ) : (
                       <AntDesign name='history' size={24} color={color} />
                     )}
+                  </View>
+                ),
+              }}
+            />
+
+            <Tabs.Screen
+              name='profile'
+              options={{
+                title: "Profile",
+                tabBarIcon: ({ focused, color }) => (
+                  <View style={focused && styles.activeTabIcon}>
+                    <Ionicons
+                      name={focused ? "person" : "person-outline"}
+                      size={24}
+                      color={color}
+                    />
                   </View>
                 ),
               }}
