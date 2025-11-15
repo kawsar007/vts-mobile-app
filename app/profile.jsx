@@ -6,12 +6,13 @@ import {
   TouchableOpacity,
   Alert 
 } from "react-native";
-import ThemedView from "../../components/ThemedView";
-import ThemedText from "../../components/ThemedText";
-import Spacer from "../../components/Spacer";
-import { useUser } from "../../hooks/useUser";
-import ThemedButton from "../../components/ThemedButton";
-import { Colors } from "../../constants/Colors";
+// import ThemedView from "../components/ThemedView";
+import ThemedView from "../components/ThemedView";
+import ThemedText from "../components/ThemedText";
+import Spacer from "../components/Spacer";
+import { useUser } from "../hooks/useUser";
+import ThemedButton from "../components/ThemedButton";
+import { Colors } from "../constants/Colors";
 
 const Profile = () => {
   const { logout, user } = useUser();

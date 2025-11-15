@@ -92,7 +92,7 @@ export default function DashboardLayout() {
 
   // Drawer menu items
   const drawerItems = [
-    { icon: "home-outline", label: "Home", route: "home" },
+    { icon: "person-outline", label: "Profile", route: "profile" },
     { icon: "settings-outline", label: "Settings", route: "settings" },
     { icon: "help-circle-outline", label: "Help & Support", route: "help" },
     { icon: "information-circle-outline", label: "About", route: "about" },
@@ -405,8 +405,7 @@ export default function DashboardLayout() {
                 marginTop: 4,
               },
             }}
-            initialRouteName="map"
-            >
+            initialRouteName='map'>
             <Tabs.Screen
               name='map'
               options={{
@@ -440,13 +439,13 @@ export default function DashboardLayout() {
             />
 
             <Tabs.Screen
-              name='profile'
+              name='vehicles'
               options={{
-                title: "Profile",
+                title: "Vehicles",
                 tabBarIcon: ({ focused, color }) => (
                   <View style={focused && styles.activeTabIcon}>
                     <Ionicons
-                      name={focused ? "person" : "person-outline"}
+                      name={focused ? "car" : "car-outline"}
                       size={24}
                       color={color}
                     />
