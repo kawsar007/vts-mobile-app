@@ -64,7 +64,14 @@ class ApiService {
   // Get vehicles with query parameters
   async getVehiclesWithQuery(queryParams = {}) {
     const queryString = new URLSearchParams(queryParams).toString();
-    const endpoint = `/api/vehicle/all-vehicles${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `vehicle/all-vehicles${queryString ? `?${queryString}` : ''}`;
+    return this.fetchWithAuth(endpoint);
+  }
+
+  // Get vehicles with query parameters
+  async getAllVehiclesLastLocation(queryParams = {}) {
+    const queryString = new URLSearchParams(queryParams).toString();
+    const endpoint = `location/last?vehicles=${queryString ? `?${queryString}` : ''}`;
     return this.fetchWithAuth(endpoint);
   }
 }
