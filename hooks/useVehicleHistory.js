@@ -30,7 +30,7 @@ export const useVehicleHistory = () => {
         `http://45.33.50.13/api/location/history?${queryString}`
       );
       const data = await response.json();
-      setHistory(data?.data);
+      setHistory(data?.data.slice(0, 100));
 
     } catch (err) {
       setError(err.message || 'Failed to fetch vehicle history');
@@ -51,5 +51,6 @@ export const useVehicleHistory = () => {
     error,
     fetchHistory,
     clearHistory,
+    isHistoryActive: history.length > 0,
   };
 }

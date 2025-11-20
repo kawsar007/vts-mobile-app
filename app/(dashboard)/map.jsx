@@ -1,5 +1,11 @@
 // app/(dashboard)/map.js
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
 import {
   View,
   ActivityIndicator,
@@ -26,6 +32,7 @@ import VehicleListModal from "./_components/VehicleListModal";
 import HistoryModal from "./_components/HistoryModal";
 import { useVehicleHistory } from "../../hooks/useVehicleHistory";
 import InfoRow from "./_components/InfoRow";
+import { calculateBearing } from "../../helper/calculateBearing";
 
 const { height } = Dimensions.get("window");
 
@@ -63,6 +70,7 @@ export default function GoogleMap({
     loading: loadingHistory,
     fetchHistory,
     clearHistory,
+    isHistoryActive,
   } = useVehicleHistory();
 
   const initialRegion = useMemo(
@@ -217,23 +225,76 @@ export default function GoogleMap({
   // Memoized history route
   const renderHistoryRoute = useCallback(() => {
     if (history.length === 0) return null;
+    const validPoints = history
+      .map((p, index) => ({
+        ...p,
+        index,
+        latitude: parseFloat(p.latitude),
+        longitude: parseFloat(p.longitude),
+      }))
+      .filter(
+        (p) =>
+          !isNaN(p.latitude) &&
+          !isNaN(p.longitude) &&
+          !(p.latitude === 0 && p.longitude === 0),
+      );
 
-    const coords = history.map((point) => ({
+    if (validPoints.length < 1) return null;
+
+    const coords = validPoints.map((point) => ({
       latitude: parseFloat(point.latitude),
       longitude: parseFloat(point.longitude),
     }));
 
     return (
       <>
-        <Polyline coordinates={coords} strokeColor='#3b82f6' strokeWidth={5} />
+        {/* Main Route Line */}
+        <Polyline
+          coordinates={coords}
+          strokeColor='#3b82f6'
+          strokeWidth={6}
+          zIndex={10}
+        />
+
+        {/* Direction Arrows */}
+        {validPoints.map((point, index) => {
+          if (index === validPoints.length - 1) return null; // no arrow on last point
+
+          const next = validPoints[index + 1];
+          const bearing = calculateBearing(
+            point.latitude,
+            point.longitude,
+            next.latitude,
+            next.longitude,
+          );
+
+          return (
+            <Marker
+              key={`arrow-${point.index}`}
+              coordinate={{
+                latitude: point.latitude,
+                longitude: point.longitude,
+              }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              flat={true}
+              rotation={bearing}
+              zIndex={20}>
+              <View style={styles.arrowContainer}>
+                <Ionicons name='play' size={20} color='#1e40af' />
+              </View>
+            </Marker>
+          );
+        })}
+
+        {/* Start & End Flags */}
         <Marker coordinate={coords[0]} title='Start'>
-          <MaterialCommunityIcons name='flag' size={30} color='#22c55e' />
+          <MaterialCommunityIcons name='flag' size={34} color='#22c55e' />
         </Marker>
         {coords.length > 1 && (
           <Marker coordinate={coords[coords.length - 1]} title='End'>
             <MaterialCommunityIcons
               name='flag-checkered'
-              size={30}
+              size={34}
               color='#ef4444'
             />
           </Marker>
@@ -274,7 +335,7 @@ export default function GoogleMap({
         showsMyLocationButton
         showsCompass
         loadingEnabled>
-        {locations.map(renderMarker)}
+        {!isHistoryActive && locations.map(renderMarker)}
         {renderHistoryRoute()}
       </MapView>
 
@@ -612,7 +673,11 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   errorText: { color: "#fff", fontSize: 14, fontWeight: "600", flex: 1 },
-  modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
   modalContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -670,5 +735,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 2,
     borderColor: "#fff",
+  },
+  arrowContainer: {
+    // backgroundColor: "white",
+    // padding: 4,
+    // borderRadius: 20,
+    // borderWidth: 2,
+    // borderColor: "#1e40af",
+    // shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    // shadowRadius: 4,
+    elevation: 6,
   },
 });
