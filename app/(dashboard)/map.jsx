@@ -1,5 +1,5 @@
 // app/(dashboard)/map.js
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   View,
   ActivityIndicator,
@@ -75,31 +75,41 @@ export default function GoogleMap({
     [],
   );
 
+  // FIX: Safe number parsing helper
+  const isEngineRunning = useCallback((engine) => {
+    if (engine === null || engine === undefined) return false;
+    return Number(engine) === 1;
+  });
+
+  // FIX: Memoize valid coordinates
+  const validLocations = useMemo(() => {
+    return locations.filter((l) => {
+      const lat = parseFloat(l.latitude);
+      const lng = parseFloat(l.longitude);
+      return !isNaN(lat) && !isNaN(lng) && !(lat === 0 && lng === 0);
+    });
+  }, [locations]);
+
   // Fit live vehicles
   useEffect(() => {
     if (!mapReady || locations.length === 0) return;
-    const coords = locations
-      .filter((l) => {
-        const lat = parseFloat(l.latitude);
-        const lng = parseFloat(l.longitude);
-        return !isNaN(lat) && !isNaN(lng) && !(lat === 0 && lng === 0);
-      })
-      .map((l) => ({
-        latitude: parseFloat(l.latitude),
-        longitude: parseFloat(l.longitude),
-      }));
+
+    const coords = validLocations.map((l) => ({
+      latitude: parseFloat(l.latitude),
+      longitude: parseFloat(l.longitude),
+    }));
 
     if (coords.length && mapRef.current) {
-      setTimeout(
-        () =>
-          mapRef.current?.fitToCoordinates(coords, {
-            edgePadding: { top: 150, left: 80, bottom: 150, right: 80 },
-            animated: true,
-          }),
-        300,
-      );
+      const timer = setTimeout(() => {
+        mapRef.current?.fitToCoordinates(coords, {
+          edgePadding: { top: 150, left: 80, bottom: 150, right: 80 },
+          animated: true,
+        });
+      }, 300);
+
+      return () => clearTimeout(timer);
     }
-  }, [locations, mapReady]);
+  }, [validLocations, mapReady]);
 
   // Fit history route
   useEffect(() => {
@@ -115,14 +125,14 @@ export default function GoogleMap({
       }));
 
     if (coords.length && mapRef.current) {
-      setTimeout(
-        () =>
-          mapRef.current?.fitToCoordinates(coords, {
-            edgePadding: { top: 150, left: 80, bottom: 150, right: 80 },
-            animated: true,
-          }),
-        300,
-      );
+      const timer = setTimeout(() => {
+        mapRef.current?.fitToCoordinates(coords, {
+          edgePadding: { top: 150, left: 80, bottom: 150, right: 80 },
+          animated: true,
+        });
+      }, 300);
+
+      return () => clearTimeout(timer);
     }
   }, [history, mapReady]);
 
@@ -133,12 +143,27 @@ export default function GoogleMap({
     }
   }, [locations, mapReady]);
 
-  const getVehicleDetails = (plate) =>
-    vehicles.find((v) => v.number_plate === plate);
-  const formatTime = (ts) =>
-    ts ? new Date(Number(ts) * 1000).toLocaleString() : "N/A";
-  const getMarkerColor = (engine) =>
-    Number(engine) === 1 ? "#22c55e" : "#ef4444";
+  // Memoized helpers
+  const getVehicleDetails = useCallback(
+    (plate) => vehicles.find((v) => v.number_plate === plate),
+    [vehicles],
+  );
+
+  const formatTime = useCallback((ts) => {
+    if (!ts) return "N/A";
+    try {
+      return new Date(Number(ts) * 1000).toLocaleString();
+    } catch {
+      return "N/A";
+    }
+  }, []);
+
+  const getMarkerColor = useCallback(
+    (engine) => {
+      return isEngineRunning(engine) ? "#22c55e" : "#ef4444";
+    },
+    [isEngineRunning],
+  );
 
   // const handleMarkerPress = (location) => {
   //   const details = getVehicleDetails(location.vehicle);
@@ -149,57 +174,64 @@ export default function GoogleMap({
 
   // const handleRefresh = async () => await refresh();
 
-  const fetchVehicleHistory = async () => {
-    if (!selectedPlate) return Alert.alert("Error", "Select a vehicle");
-    fetchHistory(selectedPlate, startDate, endDate);
-  };
+  const handleFetchHistory = useCallback(
+    (plate, start, end) => {
+      fetchHistory(plate, start, end);
+    },
+    [fetchHistory],
+  );
 
-  const renderMarker = (loc) => {
-    const lat = parseFloat(loc.latitude);
-    const lng = parseFloat(loc.longitude);
-    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return null;
-    // const isRunning = Number(loc.engine) === 1;
+  // Memoized marker rendering
+  const renderMarker = useCallback(
+    (loc) => {
+      const lat = parseFloat(loc.latitude);
+      const lng = parseFloat(loc.longitude);
+      if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return null;
 
-    return (
-      <Marker
-        key={loc.vehicle}
-        coordinate={{ latitude: lat, longitude: lng }}
-        onPress={() =>
-          setSelectedVehicle({
-            ...loc,
-            ...(getVehicleDetails(loc.vehicle) || {}),
-          })
-        }
-        tracksViewChanges={!markersRendered}>
-        <View style={styles.markerContainer}>
-          <View
-            style={[
-              styles.markerInner,
-              { backgroundColor: getMarkerColor(loc.engine) },
-            ]}>
-            <MaterialCommunityIcons
-              name={Number(loc.engine) === 1 ? "truck-fast" : "truck"}
-              size={20}
-              color='#fff'
-            />
-          </View>
-          {Number(loc.engine) !== 1 && (
-            <View style={styles.stopBadge}>
-              <MaterialCommunityIcons name='stop' size={10} color='#fff' />
+      const running = isEngineRunning(loc.engine);
+
+      return (
+        <Marker
+          key={loc.vehicle}
+          coordinate={{ latitude: lat, longitude: lng }}
+          onPress={() => {
+            const details = getVehicleDetails(loc.vehicle) || {};
+            setSelectedVehicle({ ...loc, ...details });
+          }}
+          tracksViewChanges={!markersRendered}>
+          <View style={styles.markerContainer}>
+            <View
+              style={[
+                styles.markerInner,
+                { backgroundColor: running ? "#22c55e" : "#ef4444" },
+              ]}>
+              <MaterialCommunityIcons
+                name={running ? "truck-fast" : "truck"}
+                size={20}
+                color='#fff'
+              />
             </View>
-          )}
-        </View>
-      </Marker>
-    );
-  };
+            {!running && (
+              <View style={styles.stopBadge}>
+                <MaterialCommunityIcons name='stop' size={10} color='#fff' />
+              </View>
+            )}
+          </View>
+        </Marker>
+      );
+    },
+    [markersRendered, getVehicleDetails, isEngineRunning],
+  );
 
-  const renderHistoryRoute = () => {
+  // Memoized history route
+  const renderHistoryRoute = useCallback(() => {
     if (history.length === 0) return null;
 
     const coords = history.map((point) => ({
       latitude: parseFloat(point.latitude),
       longitude: parseFloat(point.longitude),
     }));
+
     return (
       <>
         <Polyline coordinates={coords} strokeColor='#3b82f6' strokeWidth={5} />
@@ -217,7 +249,16 @@ export default function GoogleMap({
         )}
       </>
     );
-  };
+  }, [history]);
+
+  // Memoized stats
+  const stats = useMemo(() => {
+    const running = validLocations.filter((l) =>
+      isEngineRunning(l.engine),
+    ).length;
+    const stopped = validLocations.length - running;
+    return { running, stopped };
+  }, [validLocations, isEngineRunning]);
 
   if (vehiclesLoading) {
     return (
@@ -272,22 +313,18 @@ export default function GoogleMap({
               color={theme.iconColorFocused}
             />
             <ThemedText style={styles.statValue}>
-              {locations.length}/{vehicles.length}
+              {validLocations.length}/{vehicles.length}
             </ThemedText>
             <ThemedText style={styles.statLabel}>On Map</ThemedText>
           </View>
           <View style={styles.statItem}>
             <MaterialCommunityIcons name='engine' size={20} color='#22c55e' />
-            <ThemedText style={styles.statValue}>
-              {locations.filter((l) => Number(l.engine) === 1).length}
-            </ThemedText>
+            <ThemedText style={styles.statValue}>{stats.running}</ThemedText>
             <ThemedText style={styles.statLabel}>Running</ThemedText>
           </View>
           <View style={styles.statItem}>
             <MaterialCommunityIcons name='stop' size={20} color='#ef4444' />
-            <ThemedText style={styles.statValue}>
-              {locations.filter((l) => Number(l.engine) !== 1).length}
-            </ThemedText>
+            <ThemedText style={styles.statValue}>{stats.stopped}</ThemedText>
             <ThemedText style={styles.statLabel}>Stopped</ThemedText>
           </View>
         </View>
@@ -331,7 +368,11 @@ export default function GoogleMap({
             <View style={styles.modalHeader}>
               <View style={styles.modalTitleContainer}>
                 <MaterialCommunityIcons
-                  name={selectedVehicle?.engine === 1 ? "truck-fast" : "truck"}
+                  name={
+                    isEngineRunning(selectedVehicle?.engine)
+                      ? "truck-fast"
+                      : "truck"
+                  }
                   size={24}
                   color={getMarkerColor(selectedVehicle?.engine)}
                 />
@@ -340,7 +381,11 @@ export default function GoogleMap({
                 </ThemedText>
               </View>
               <TouchableOpacity onPress={() => setSelectedVehicle(null)}>
-                <Ionicons name="close" size={24} color={isDark ? "#fff" : "#000"} />
+                <Ionicons
+                  name='close'
+                  size={24}
+                  color={isDark ? "#fff" : "#000"}
+                />
               </TouchableOpacity>
             </View>
 
@@ -349,12 +394,15 @@ export default function GoogleMap({
                 style={[
                   styles.statusBadge,
                   {
-                    backgroundColor:
-                      selectedVehicle?.engine === 1 ? "#22c55e" : "#ef4444",
+                    backgroundColor: isEngineRunning(selectedVehicle?.engine)
+                      ? "#22c55e"
+                      : "#ef4444",
                   },
                 ]}>
                 <Text style={styles.statusText}>
-                  {selectedVehicle?.engine === 1 ? "Running" : "Stopped"}
+                  {isEngineRunning(selectedVehicle?.engine)
+                    ? "Running"
+                    : "Stopped"}
                 </Text>
               </View>
 
@@ -457,15 +505,21 @@ export default function GoogleMap({
       <Modal
         visible={showVehicles}
         transparent
-        animationType="slide"
-        onRequestClose={onCloseVehicles}
-      >
+        animationType='slide'
+        onRequestClose={onCloseVehicles}>
         <View style={styles.modalOverlay}>
-          <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={onCloseVehicles} />
-          <View style={[styles.modalContent, { backgroundColor: isDark ? "#1a1a1a" : "#fff" }]}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            onPress={onCloseVehicles}
+          />
+          <View
+            style={[
+              styles.modalContent,
+              { backgroundColor: isDark ? "#1a1a1a" : "#fff" },
+            ]}>
             <VehicleListModal
               vehicles={vehicles}
-              locations={locations}
+              locations={validLocations}
               onClose={onCloseVehicles}
               mapRef={mapRef}
               isDark={isDark}
@@ -478,12 +532,18 @@ export default function GoogleMap({
       <Modal
         visible={showHistory}
         transparent
-        animationType="slide"
-        onRequestClose={onCloseHistory}
-      >
+        animationType='slide'
+        onRequestClose={onCloseHistory}>
         <View style={styles.modalOverlay}>
-          <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={onCloseHistory} />
-          <View style={[styles.modalContent, { backgroundColor: isDark ? "#1a1a1a" : "#fff" }]}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            onPress={onCloseHistory}
+          />
+          <View
+            style={[
+              styles.modalContent,
+              { backgroundColor: isDark ? "#1a1a1a" : "#fff" },
+            ]}>
             <HistoryModal
               vehicles={vehicles}
               selectedPlate={selectedPlate}
@@ -493,7 +553,7 @@ export default function GoogleMap({
               endDate={endDate}
               setEndDate={setEndDate}
               loading={loadingHistory}
-              onSubmit={fetchHistory}
+              onSubmit={handleFetchHistory}
               onClear={clearHistory}
               onClose={onCloseHistory}
               isDark={isDark}
@@ -504,7 +564,6 @@ export default function GoogleMap({
     </ThemedView>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -533,7 +592,7 @@ const styles = StyleSheet.create({
   statItem: { alignItems: "center" },
   statValue: { fontSize: 20, fontWeight: "700", marginTop: 4 },
   statLabel: { fontSize: 11, opacity: 0.7, marginTop: 2 },
-  refreshButton: {
+  refreshBtn: {
     position: "absolute",
     bottom: 100,
     right: 16,
@@ -548,9 +607,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
-  errorContainer: {
+  errorBanner: {
     position: "absolute",
-    top: 80,
+    top: 120,
     left: 16,
     right: 16,
     flexDirection: "row",
@@ -562,7 +621,7 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   errorText: { color: "#fff", fontSize: 14, fontWeight: "600", flex: 1 },
-  modalOverlay: { flex: 1, justifyContent: "flex-end" },
+  modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" },
   modalContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
