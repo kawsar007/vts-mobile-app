@@ -33,6 +33,7 @@ import HistoryModal from "./_components/HistoryModal";
 import { useVehicleHistory } from "../../hooks/useVehicleHistory";
 import InfoRow from "./_components/InfoRow";
 import { calculateBearing } from "../../helper/calculateBearing";
+import HistoryRoute from "./_components/HistoryRoute";
 
 const { height } = Dimensions.get("window");
 
@@ -50,6 +51,7 @@ export default function GoogleMap({
   const [mapReady, setMapReady] = useState(false);
   const [markersRendered, setMarkersRendered] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
+  const [currentRegion, setCurrentRegion] = useState(null);
 
   // History states
   const [selectedPlate, setSelectedPlate] = useState("");
@@ -83,7 +85,7 @@ export default function GoogleMap({
     [],
   );
 
-  // FIX: Safe number parsing helper
+  // Safe number parsing helper
   const isEngineRunning = useCallback((engine) => {
     if (engine === null || engine === undefined) return false;
     return Number(engine) === 1;
@@ -100,7 +102,7 @@ export default function GoogleMap({
 
   // Fit live vehicles
   useEffect(() => {
-    if (!mapReady || locations.length === 0) return;
+    if (!mapReady || isHistoryActive || validLocations.length === 0) return;
 
     const coords = validLocations.map((l) => ({
       latitude: parseFloat(l.latitude),
@@ -120,29 +122,29 @@ export default function GoogleMap({
   }, [validLocations, mapReady]);
 
   // Fit history route
-  useEffect(() => {
-    if (!mapReady || history.length === 0) return;
-    const coords = history
-      .filter(
-        (p) =>
-          !isNaN(parseFloat(p.latitude)) && !isNaN(parseFloat(p.longitude)),
-      )
-      .map((p) => ({
-        latitude: parseFloat(p.latitude),
-        longitude: parseFloat(p.longitude),
-      }));
+  // useEffect(() => {
+  //   if (!mapReady || history.length === 0) return;
+  //   const coords = history
+  //     .filter(
+  //       (p) =>
+  //         !isNaN(parseFloat(p.latitude)) && !isNaN(parseFloat(p.longitude)),
+  //     )
+  //     .map((p) => ({
+  //       latitude: parseFloat(p.latitude),
+  //       longitude: parseFloat(p.longitude),
+  //     }));
 
-    if (coords.length && mapRef.current) {
-      const timer = setTimeout(() => {
-        mapRef.current?.fitToCoordinates(coords, {
-          edgePadding: { top: 150, left: 80, bottom: 150, right: 80 },
-          animated: true,
-        });
-      }, 300);
+  //   if (coords.length && mapRef.current) {
+  //     const timer = setTimeout(() => {
+  //       mapRef.current?.fitToCoordinates(coords, {
+  //         edgePadding: { top: 150, left: 80, bottom: 150, right: 80 },
+  //         animated: true,
+  //       });
+  //     }, 300);
 
-      return () => clearTimeout(timer);
-    }
-  }, [history, mapReady]);
+  //     return () => clearTimeout(timer);
+  //   }
+  // }, [history, mapReady]);
 
   useEffect(() => {
     if (locations.length && mapReady) {
@@ -222,86 +224,10 @@ export default function GoogleMap({
     [markersRendered, getVehicleDetails, isEngineRunning],
   );
 
-  // Memoized history route
-  const renderHistoryRoute = useCallback(() => {
-    if (history.length === 0) return null;
-    const validPoints = history
-      .map((p, index) => ({
-        ...p,
-        index,
-        latitude: parseFloat(p.latitude),
-        longitude: parseFloat(p.longitude),
-      }))
-      .filter(
-        (p) =>
-          !isNaN(p.latitude) &&
-          !isNaN(p.longitude) &&
-          !(p.latitude === 0 && p.longitude === 0),
-      );
-
-    if (validPoints.length < 1) return null;
-
-    const coords = validPoints.map((point) => ({
-      latitude: parseFloat(point.latitude),
-      longitude: parseFloat(point.longitude),
-    }));
-
-    return (
-      <>
-        {/* Main Route Line */}
-        <Polyline
-          coordinates={coords}
-          strokeColor='#3b82f6'
-          strokeWidth={6}
-          zIndex={10}
-        />
-
-        {/* Direction Arrows */}
-        {validPoints.map((point, index) => {
-          if (index === validPoints.length - 1) return null; // no arrow on last point
-
-          const next = validPoints[index + 1];
-          const bearing = calculateBearing(
-            point.latitude,
-            point.longitude,
-            next.latitude,
-            next.longitude,
-          );
-
-          return (
-            <Marker
-              key={`arrow-${point.index}`}
-              coordinate={{
-                latitude: point.latitude,
-                longitude: point.longitude,
-              }}
-              anchor={{ x: 0.5, y: 0.5 }}
-              flat={true}
-              rotation={bearing}
-              zIndex={20}>
-              <View style={styles.arrowContainer}>
-                <Ionicons name='play' size={20} color='#1e40af' />
-              </View>
-            </Marker>
-          );
-        })}
-
-        {/* Start & End Flags */}
-        <Marker coordinate={coords[0]} title='Start'>
-          <MaterialCommunityIcons name='flag' size={34} color='#22c55e' />
-        </Marker>
-        {coords.length > 1 && (
-          <Marker coordinate={coords[coords.length - 1]} title='End'>
-            <MaterialCommunityIcons
-              name='flag-checkered'
-              size={34}
-              color='#ef4444'
-            />
-          </Marker>
-        )}
-      </>
-    );
-  }, [history]);
+  // Handle region changes
+  const handleRegionChangeComplete = useCallback((region) => {
+    setCurrentRegion(region);
+  }, []);
 
   // Memoized stats
   const stats = useMemo(() => {
@@ -334,9 +260,15 @@ export default function GoogleMap({
         showsUserLocation
         showsMyLocationButton
         showsCompass
-        loadingEnabled>
+        loadingEnabled
+        onRegionChangeComplete={handleRegionChangeComplete}>
         {!isHistoryActive && locations.map(renderMarker)}
-        {renderHistoryRoute()}
+        <HistoryRoute
+          history={history}
+          mapRef={mapRef}
+          isHistoryActive={isHistoryActive}
+          currentRegion={currentRegion}
+        />
       </MapView>
 
       {/* Loading Overlay */}
@@ -736,16 +668,16 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#fff",
   },
-  arrowContainer: {
-    // backgroundColor: "white",
-    // padding: 4,
-    // borderRadius: 20,
-    // borderWidth: 2,
-    // borderColor: "#1e40af",
-    // shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    // shadowRadius: 4,
-    elevation: 6,
-  },
+  // arrowContainer: {
+  //   // backgroundColor: "white",
+  //   // padding: 4,
+  //   // borderRadius: 20,
+  //   // borderWidth: 2,
+  //   // borderColor: "#1e40af",
+  //   // shadowColor: "#000",
+  //   shadowOffset: { width: 0, height: 2 },
+  //   shadowOpacity: 0.3,
+  //   // shadowRadius: 4,
+  //   elevation: 6,
+  // },
 });
