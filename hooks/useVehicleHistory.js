@@ -27,7 +27,7 @@ export const useVehicleHistory = () => {
       const queryString = `vehicle=${encodeURIComponent(vehicleNumberPlate)}&start_time=${encodeURIComponent(formattedStart)}&end_time=${encodeURIComponent(formattedEnd)}`;
 
       const response = await fetch(
-        `http://45.33.50.13/api/location/history?${queryString}`
+        `http://69.167.170.135/api/location/history?${queryString}`
       );
       const data = await response.json();
       setHistory(data?.data || []);
