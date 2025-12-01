@@ -1,4 +1,3 @@
-// app/(dashboard)/_components/HistoryModal.js
 import React, { useState, useCallback } from "react";
 import {
   View,
@@ -7,13 +6,12 @@ import {
   ScrollView,
   ActivityIndicator,
   StyleSheet,
-  Platform,
   Alert,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "../../../components/ThemedText";
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 
 export default function HistoryModal({
   vehicles,
@@ -29,26 +27,31 @@ export default function HistoryModal({
   onClose,
   isDark,
 }) {
-  const [showStart, setShowStart] = useState(false);
-  const [showEnd, setShowEnd] = useState(false);
+  const [isStartPickerVisible, setStartPickerVisible] = useState(false);
+  const [isEndPickerVisible, setEndPickerVisible] = useState(false);
 
-  const onStartChange = useCallback(
-    (event, selected) => {
-      setShowStart(Platform.OS === "ios");
-      if (selected) setStartDate(selected);
+  const showStartPicker = () => setStartPickerVisible(true);
+  const hideStartPicker = () => setStartPickerVisible(false);
+
+  const showEndPicker = () => setEndPickerVisible(true);
+  const hideEndPicker = () => setEndPickerVisible(false);
+
+  const handleStartConfirm = useCallback(
+    (date) => {
+      setStartDate(date);
+      hideStartPicker();
     },
     [setStartDate],
   );
 
-  const onEndChange = useCallback(
-    (event, selected) => {
-      setShowEnd(Platform.OS === "ios");
-      if (selected) setEndDate(selected);
+  const handleEndConfirm = useCallback(
+    (date) => {
+      setEndDate(date);
+      hideEndPicker();
     },
     [setEndDate],
   );
 
-  // FIX: Proper validation and handler
   const handleSubmit = useCallback(() => {
     if (!selectedPlate) {
       Alert.alert("Error", "Please select a vehicle");
@@ -58,7 +61,6 @@ export default function HistoryModal({
       Alert.alert("Error", "Start time must be before end time");
       return;
     }
-    // Call onSubmit with proper arguments
     onSubmit(selectedPlate, startDate, endDate);
   }, [selectedPlate, startDate, endDate, onSubmit]);
 
@@ -107,21 +109,22 @@ export default function HistoryModal({
           <TouchableOpacity
             style={[
               styles.dateBtn,
-              { borderColor: isDark ? "#444" : "#e5e7eb" },
+              {
+                borderColor: isDark ? "#444" : "#e5e7eb",
+                backgroundColor: isDark ? "#2a2a2a" : "#f9fafb",
+              },
             ]}
-            onPress={() => setShowStart(true)}>
-            <Text style={{ color: isDark ? "#fff" : "#000" }}>
+            onPress={showStartPicker}>
+            <Ionicons
+              name='calendar-outline'
+              size={20}
+              color='#3b82f6'
+              style={styles.dateIcon}
+            />
+            <Text style={{ color: isDark ? "#fff" : "#000", flex: 1 }}>
               {startDate.toLocaleString()}
             </Text>
           </TouchableOpacity>
-          {showStart && (
-            <DateTimePicker
-              value={startDate}
-              mode='datetime'
-              display={Platform.OS === "ios" ? "spinner" : "default"}
-              onChange={onStartChange}
-            />
-          )}
         </View>
 
         <View style={styles.section}>
@@ -131,21 +134,22 @@ export default function HistoryModal({
           <TouchableOpacity
             style={[
               styles.dateBtn,
-              { borderColor: isDark ? "#444" : "#e5e7eb" },
+              {
+                borderColor: isDark ? "#444" : "#e5e7eb",
+                backgroundColor: isDark ? "#2a2a2a" : "#f9fafb",
+              },
             ]}
-            onPress={() => setShowEnd(true)}>
-            <Text style={{ color: isDark ? "#fff" : "#000" }}>
+            onPress={showEndPicker}>
+            <Ionicons
+              name='calendar-outline'
+              size={20}
+              color='#3b82f6'
+              style={styles.dateIcon}
+            />
+            <Text style={{ color: isDark ? "#fff" : "#000", flex: 1 }}>
               {endDate.toLocaleString()}
             </Text>
           </TouchableOpacity>
-          {showEnd && (
-            <DateTimePicker
-              value={endDate}
-              mode='datetime'
-              display={Platform.OS === "ios" ? "spinner" : "default"}
-              onChange={onEndChange}
-            />
-          )}
         </View>
 
         <View style={styles.actions}>
@@ -160,17 +164,52 @@ export default function HistoryModal({
             {loading ? (
               <ActivityIndicator color='#fff' />
             ) : (
-              <Text style={styles.btnText}>Load History</Text>
+              <>
+                <Ionicons
+                  name='search'
+                  size={18}
+                  color='#fff'
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={styles.btnText}>Load History</Text>
+              </>
             )}
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.btn, { backgroundColor: "#ef4444" }]}
             onPress={onClear}
             disabled={loading}>
+            <Ionicons
+              name='trash-outline'
+              size={18}
+              color='#fff'
+              style={{ marginRight: 8 }}
+            />
             <Text style={styles.btnText}>Clear Route</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Date Time Pickers */}
+      <DateTimePickerModal
+        isVisible={isStartPickerVisible}
+        mode='datetime'
+        onConfirm={handleStartConfirm}
+        onCancel={hideStartPicker}
+        date={startDate}
+        maximumDate={new Date()}
+        isDarkModeEnabled={isDark}
+      />
+
+      <DateTimePickerModal
+        isVisible={isEndPickerVisible}
+        mode='datetime'
+        onConfirm={handleEndConfirm}
+        onCancel={hideEndPicker}
+        date={endDate}
+        maximumDate={new Date()}
+        isDarkModeEnabled={isDark}
+      />
     </>
   );
 }
@@ -197,20 +236,33 @@ const styles = StyleSheet.create({
   dateBtn: {
     padding: 14,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
     borderRadius: 8,
-    justifyContent: "center",
+    flexDirection: "row",
+    alignItems: "center",
   },
-  actions: { flexDirection: "row", gap: 12, marginTop: 10 },
+  dateIcon: {
+    marginRight: 12,
+  },
+  actions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 10,
+    marginBottom: 20,
+  },
   btn: {
     flex: 1,
     padding: 14,
     borderRadius: 8,
+    flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
   },
   btnDisabled: {
     opacity: 0.6,
   },
-  btnText: { color: "#fff", fontWeight: "600" },
+  btnText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 15,
+  },
 });
