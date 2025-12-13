@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 export const UserContext = createContext();
 
 const API_URL = "http://69.167.170.135/api/auth/signin";
+const VALIDATE_TOKEN_URL = "http://69.167.170.135/api/auth/verify-token";
 
 export function UserProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -65,8 +66,50 @@ export function UserProvider({ children }) {
       await AsyncStorage.removeItem("authToken");
       await AsyncStorage.removeItem("userData");
       setUser(null);
+
+      router.replace("/login");
     } catch (error) {
       console.error("Logout error:", error);
+    }
+  }
+
+  // Validate token with backend
+  async function validateToken(showLog = false) {
+    try {
+      const token = await AsyncStorage.getItem("authToken");
+
+      if (!token) {
+        if (showLog) console.log("No token found");
+        return false;
+      }
+
+      const response = await fetch(VALIDATE_TOKEN_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ token }),
+      });
+
+      const data = await response.json();
+
+      if (showLog) {
+        console.log("Token validation response:", data);
+      }
+
+      // Check if token is valid based on API response
+      if (!response.ok || !data.valid) {
+        if (showLog) console.log("Token invalid - logging out");
+        await logout();
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Token validation error:", error);
+      // On network error, don't logout - allow offline usage
+      // Return null to indicate we couldn't validate (vs false = invalid)
+      return null;
     }
   }
 
@@ -86,6 +129,13 @@ export function UserProvider({ children }) {
 
         if (hasAllowedRole) {
           setUser(parsedUser);
+
+          // Validate token on app start (silent validation)
+          validateToken(false).then((isValid) => {
+            if (isValid === false) {
+              console.log("Token invalid on app start - user logged out");
+            }
+          });
         } else {
           // Clear invalid session
           await logout();
@@ -109,13 +159,52 @@ export function UserProvider({ children }) {
     }
   }
 
+  // Enhanced fetch wrapper that handles auth errors
+  async function authenticatedFetch(url, options = {}) {
+    try {
+      const token = await getAuthToken();
+
+      if (!token) {
+        throw new Error("No authentication token");
+      }
+
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          ...options.headers,
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      // Check for 401 Unauthorized
+      if (response.status === 401) {
+        console.log("401 Unauthorized - logging out");
+        await logout();
+        throw new Error("Session expired. Please login again.");
+      }
+
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
   useEffect(() => {
     getInitialUserValue();
   }, []);
 
   return (
     <UserContext.Provider
-      value={{ user, login, logout, authChecked, getAuthToken }}>
+      value={{
+        user,
+        login,
+        logout,
+        authChecked,
+        getAuthToken,
+        validateToken,
+        authenticatedFetch,
+      }}>
       {children}
     </UserContext.Provider>
   );

@@ -13,6 +13,7 @@ import {
   Animated,
   TouchableWithoutFeedback,
   ScrollView,
+  AppState
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useColorScheme } from "react-native";
@@ -30,10 +31,14 @@ const { width, height } = Dimensions.get("window");
 const DRAWER_WIDTH = width * 0.75;
 
 export default function DashboardLayout() {
-  const { logout, user } = useUser();
+  const { logout, user, validateToken } = useUser();
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme] ?? Colors.light;
   const isDark = colorScheme === "dark";
+
+//   useEffect(() => {
+// logout()
+//   }, []);
 
   const [activeTab, setActiveTab] = useState("map");
   const [showVehicles, setShowVehicles] = useState(false);
@@ -47,6 +52,22 @@ export default function DashboardLayout() {
   const [notifAnim] = useState(new Animated.Value(width));
 
   const inactiveColor = isDark ? "#6b7280" : "#9ca3af";
+
+  // Token validation on app state change (when app comes to foreground)
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState === "active") {
+        // App came to foreground - validate token
+        validateToken(true).then((isValid) => {
+          if (isValid === false) {
+            console.log("Session expired - redirecting to login");
+          }
+        });
+      }
+    });
+
+    return () => subscription.remove();
+  }, [validateToken]);
 
   // Side Navigation Animation
   useEffect(() => {
