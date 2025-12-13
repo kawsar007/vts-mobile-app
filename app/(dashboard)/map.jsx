@@ -34,6 +34,8 @@ import { useVehicleHistory } from "../../hooks/useVehicleHistory";
 import InfoRow from "./_components/InfoRow";
 import { calculateBearing } from "../../helper/calculateBearing";
 import HistoryRoute from "./_components/HistoryRoute";
+import { useVehicleFollow } from "../../hooks/useVehicleFollow";
+import FollowPath from "./_components/FollowPath";
 
 const { height } = Dimensions.get("window");
 
@@ -75,6 +77,15 @@ export default function GoogleMap({
     isHistoryActive,
   } = useVehicleHistory();
 
+  // Follow feature
+  const {
+    followingVehicle,
+    followPath,
+    isFollowing,
+    startFollowing,
+    stopFollowing,
+  } = useVehicleFollow(mapRef);
+
   const initialRegion = useMemo(
     () => ({
       latitude: 23.8103,
@@ -89,7 +100,7 @@ export default function GoogleMap({
   const isEngineRunning = useCallback((engine) => {
     if (engine === null || engine === undefined) return false;
     return Number(engine) === 1;
-  });
+  }, []);
 
   // FIX: Memoize valid coordinates
   const validLocations = useMemo(() => {
@@ -102,7 +113,13 @@ export default function GoogleMap({
 
   // Fit live vehicles
   useEffect(() => {
-    if (!mapReady || isHistoryActive || validLocations.length === 0) return;
+    if (
+      !mapReady ||
+      isHistoryActive ||
+      isFollowing ||
+      validLocations.length === 0
+    )
+      return;
 
     const coords = validLocations.map((l) => ({
       latitude: parseFloat(l.latitude),
@@ -119,32 +136,7 @@ export default function GoogleMap({
 
       return () => clearTimeout(timer);
     }
-  }, [validLocations, mapReady]);
-
-  // Fit history route
-  // useEffect(() => {
-  //   if (!mapReady || history.length === 0) return;
-  //   const coords = history
-  //     .filter(
-  //       (p) =>
-  //         !isNaN(parseFloat(p.latitude)) && !isNaN(parseFloat(p.longitude)),
-  //     )
-  //     .map((p) => ({
-  //       latitude: parseFloat(p.latitude),
-  //       longitude: parseFloat(p.longitude),
-  //     }));
-
-  //   if (coords.length && mapRef.current) {
-  //     const timer = setTimeout(() => {
-  //       mapRef.current?.fitToCoordinates(coords, {
-  //         edgePadding: { top: 150, left: 80, bottom: 150, right: 80 },
-  //         animated: true,
-  //       });
-  //     }, 300);
-
-  //     return () => clearTimeout(timer);
-  //   }
-  // }, [history, mapReady]);
+  }, [validLocations, mapReady, isHistoryActive, isFollowing]);
 
   useEffect(() => {
     if (locations.length && mapReady) {
@@ -180,6 +172,13 @@ export default function GoogleMap({
       fetchHistory(plate, start, end);
     },
     [fetchHistory],
+  );
+
+  const handleToggleFollow = useCallback(
+    (plate) => {
+      startFollowing(plate);
+    },
+    [startFollowing],
   );
 
   // Memoized marker rendering
@@ -262,13 +261,14 @@ export default function GoogleMap({
         showsCompass
         loadingEnabled
         onRegionChangeComplete={handleRegionChangeComplete}>
-        {!isHistoryActive && locations.map(renderMarker)}
+        {!isHistoryActive && !isFollowing && locations.map(renderMarker)}
         <HistoryRoute
           history={history}
           mapRef={mapRef}
           isHistoryActive={isHistoryActive}
           currentRegion={currentRegion}
         />
+        <FollowPath path={followPath} isActive={isFollowing} />
       </MapView>
 
       {/* Loading Overlay */}
@@ -324,6 +324,14 @@ export default function GoogleMap({
           <Ionicons name='refresh' size={24} color='#fff' />
         )}
       </TouchableOpacity>
+
+      {isFollowing && (
+        <TouchableOpacity
+          style={[styles.stopFollowBtn, { backgroundColor: "#ef4444" }]}
+          onPress={stopFollowing}>
+          <MaterialCommunityIcons name='target-off' size={24} color='#fff' />
+        </TouchableOpacity>
+      )}
 
       {/* Error Banner */}
       {error && (
@@ -507,6 +515,8 @@ export default function GoogleMap({
               onClose={onCloseVehicles}
               mapRef={mapRef}
               isDark={isDark}
+              followingVehicle={followingVehicle}
+              onToggleFollow={handleToggleFollow}
             />
           </View>
         </View>
@@ -579,6 +589,21 @@ const styles = StyleSheet.create({
   refreshBtn: {
     position: "absolute",
     bottom: 100,
+    right: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  stopFollowBtn: {
+    position: "absolute",
+    bottom: 170,
     right: 16,
     width: 56,
     height: 56,
@@ -668,16 +693,4 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#fff",
   },
-  // arrowContainer: {
-  //   // backgroundColor: "white",
-  //   // padding: 4,
-  //   // borderRadius: 20,
-  //   // borderWidth: 2,
-  //   // borderColor: "#1e40af",
-  //   // shadowColor: "#000",
-  //   shadowOffset: { width: 0, height: 2 },
-  //   shadowOpacity: 0.3,
-  //   // shadowRadius: 4,
-  //   elevation: 6,
-  // },
 });

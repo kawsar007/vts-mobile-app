@@ -16,6 +16,8 @@ export default function VehicleListModal({
   onClose,
   mapRef,
   isDark,
+  followingVehicle,
+  onToggleFollow,
 }) {
   const handleVehiclePress = (plate) => {
     const loc = locations.find((l) => l.vehicle === plate);
@@ -37,9 +39,15 @@ export default function VehicleListModal({
     onClose();
   };
 
+  const handleFollowPress = (plate, e) => {
+    e.stopPropagation();
+    onToggleFollow(plate);
+  };
+
   const renderItem = ({ item }) => {
     const loc = locations.find((l) => l.vehicle === item.number_plate);
     const isRunning = loc && Number(loc.engine) === 1;
+    const isFollowing = followingVehicle === item.number_plate;
 
     return (
       <TouchableOpacity
@@ -60,7 +68,19 @@ export default function VehicleListModal({
             </Text>
           </View>
         </View>
-        <Ionicons name='chevron-forward' size={22} color='#9ca3af' />
+
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.followBtn, isFollowing && styles.followBtnActive]}
+            onPress={(e) => handleFollowPress(item.number_plate, e)}>
+            <MaterialCommunityIcons
+              name={isFollowing ? "target-account" : "target"}
+              size={20}
+              color={isFollowing ? "#fff" : "#6366f1"}
+            />
+          </TouchableOpacity>
+          <Ionicons name='chevron-forward' size={22} color='#9ca3af' />
+        </View>
       </TouchableOpacity>
     );
   };
@@ -68,9 +88,16 @@ export default function VehicleListModal({
   return (
     <>
       <View style={styles.header}>
-        <ThemedText style={styles.title}>
-          All Vehicles ({vehicles.length})
-        </ThemedText>
+        <View>
+          <ThemedText style={styles.title}>
+            All Vehicles ({vehicles.length})
+          </ThemedText>
+          {followingVehicle && (
+            <Text style={styles.followingText}>
+              Following: {followingVehicle}
+            </Text>
+          )}
+        </View>
         <TouchableOpacity onPress={onClose}>
           <Ionicons name='close' size={28} color={isDark ? "#fff" : "#000"} />
         </TouchableOpacity>
@@ -95,6 +122,12 @@ const styles = StyleSheet.create({
     borderBottomColor: "#e5e7eb",
   },
   title: { fontSize: 20, fontWeight: "700" },
+  followingText: {
+    fontSize: 12,
+    color: "#6366f1",
+    fontWeight: "600",
+    marginTop: 4,
+  },
   item: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -103,8 +136,24 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#e5e7eb",
   },
-  info: { flexDirection: "row", alignItems: "center", gap: 12 },
-  texts: { justifyContent: "center" },
+  info: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  texts: { justifyContent: "center", flex: 1 },
   plate: { fontSize: 16, fontWeight: "600" },
   subtitle: { fontSize: 13, color: "#9ca3af" },
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  followBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#eef2ff",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  followBtnActive: {
+    backgroundColor: "#6366f1",
+  },
 });
