@@ -116,7 +116,7 @@ export default function DashboardLayout() {
             <Ionicons name='menu' size={28} color={isDark ? "#fff" : "#000"} />
           </TouchableOpacity>
           <Text style={[styles.appTitle, { color: isDark ? "#fff" : "#000" }]}>
-            TrackFleet
+            GeonVTS
           </Text>
           <TouchableOpacity
             style={styles.iconButton}

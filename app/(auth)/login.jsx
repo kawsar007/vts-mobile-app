@@ -117,121 +117,128 @@ const Login = () => {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}>
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
-          keyboardShouldPersistTaps='handled'
-          showsVerticalScrollIndicator={false}>
-          <ThemedView style={styles.container}>
-            <View style={styles.headerContainer}>
-              <ThemedText title={true} style={styles.title}>
-                Welcome Back
-              </ThemedText>
-              <ThemedText style={styles.subtitle}>
-                Sign in to continue
-              </ThemedText>
-            </View>
-
-            <View style={styles.formContainer}>
-              {/* General Error Message */}
-              {errors.general && (
-                <View style={styles.errorContainer}>
-                  <Text style={styles.errorText}>{errors.general}</Text>
-                </View>
-              )}
-
-              {/* Username Input */}
-              <View style={styles.inputWrapper}>
-                <ThemedText style={styles.label}>Username</ThemedText>
-                <ThemedTextInput
-                  style={[styles.input, errors.username && styles.inputError]}
-                  placeholder='Enter your username'
-                  autoCapitalize='none'
-                  autoCorrect={false}
-                  onChangeText={handleUsernameChange}
-                  value={username}
-                  editable={!isLoading}
-                />
-                {errors.username && (
-                  <Text style={styles.fieldError}>{errors.username}</Text>
-                )}
-              </View>
-
-              {/* Password Input */}
-              <View style={styles.inputWrapper}>
-                <ThemedText style={styles.label}>Password</ThemedText>
-                <View style={styles.passwordContainer}>
-                  <ThemedTextInput
-                    style={[styles.input, errors.password && styles.inputError]}
-                    placeholder='Enter your password'
-                    onChangeText={handlePasswordChange}
-                    value={password}
-                    secureTextEntry={!showPassword}
-                    editable={!isLoading}
-                    autoCapitalize='none'
-                  />
-                  <TouchableOpacity
-                    style={styles.eyeIconContainer}
-                    onPress={() => setShowPassword(!showPassword)}
-                    disabled={isLoading}>
-                    <Text style={styles.eyeIcon}>
-                      {/* {showPassword ? "👁️" : "👁️‍🗨️"} */}
-                      {showPassword ? (
-                        <Ionicons name='eye' size={18} />
-                      ) : (
-                        <Entypo name='eye-with-line' size={18} color='black' />
-                      )}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                {errors.password && (
-                  <Text style={styles.fieldError}>{errors.password}</Text>
-                )}
-              </View>
-
-              {/* Forgot Password Link */}
-              <TouchableWithoutFeedback>
-                <View style={styles.forgotPasswordContainer}>
-                  <ThemedText style={styles.forgotPasswordText}>
-                    Forgot Password?
-                  </ThemedText>
-                </View>
-              </TouchableWithoutFeedback>
-
-              <Spacer height={20} />
-
-              {/* Login Button */}
-              <ThemedButton
-                onPress={handleSubmit}
-                disabled={isLoading}
-                style={[
-                  styles.loginButton,
-                  isLoading && styles.loginButtonDisabled,
-                ]}>
-                {isLoading ? (
-                  <ThemedLoader size='small' color='#f2f2f2' />
-                ) : (
-                  <Text style={styles.loginButtonText}>Login</Text>
-                )}
-              </ThemedButton>
-
-              <Spacer height={30} />
-
-              {/* Access Info */}
-              <Spacer height={20} />
-              <View style={styles.infoContainer}>
-                <ThemedText style={styles.infoText}>
-                  ℹ️ Access limited to vehicle owners and managers only
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}>
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1 }}
+            keyboardShouldPersistTaps='handled'
+            showsVerticalScrollIndicator={false}>
+            <ThemedView style={styles.container}>
+              <View style={styles.headerContainer}>
+                <ThemedText title={true} style={styles.title}>
+                  Welcome Back
+                </ThemedText>
+                <ThemedText style={styles.subtitle}>
+                  Sign in to continue
                 </ThemedText>
               </View>
-            </View>
-          </ThemedView>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </TouchableWithoutFeedback>
+
+              <View style={styles.formContainer}>
+                {/* General Error Message */}
+                {errors.general && (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>{errors.general}</Text>
+                  </View>
+                )}
+
+                {/* Username Input */}
+                <View style={styles.inputWrapper}>
+                  <ThemedText style={styles.label}>Username</ThemedText>
+                  <ThemedTextInput
+                    style={[styles.input, errors.username && styles.inputError]}
+                    placeholder='Enter your username'
+                    autoCapitalize='none'
+                    autoCorrect={false}
+                    onChangeText={handleUsernameChange}
+                    value={username}
+                    editable={!isLoading}
+                  />
+                  {errors.username && (
+                    <Text style={styles.fieldError}>{errors.username}</Text>
+                  )}
+                </View>
+
+                {/* Password Input */}
+                <View style={styles.inputWrapper}>
+                  <ThemedText style={styles.label}>Password</ThemedText>
+                  <View style={styles.passwordContainer}>
+                    <ThemedTextInput
+                      style={[
+                        styles.input,
+                        errors.password && styles.inputError,
+                      ]}
+                      placeholder='Enter your password'
+                      onChangeText={handlePasswordChange}
+                      value={password}
+                      secureTextEntry={!showPassword}
+                      editable={!isLoading}
+                      autoCapitalize='none'
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeIconContainer}
+                      onPress={() => setShowPassword(!showPassword)}
+                      disabled={isLoading}>
+                      <Text style={styles.eyeIcon}>
+                        {/* {showPassword ? "👁️" : "👁️‍🗨️"} */}
+                        {showPassword ? (
+                          <Ionicons name='eye' size={18} />
+                        ) : (
+                          <Entypo
+                            name='eye-with-line'
+                            size={18}
+                            color='black'
+                          />
+                        )}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  {errors.password && (
+                    <Text style={styles.fieldError}>{errors.password}</Text>
+                  )}
+                </View>
+
+                {/* Forgot Password Link */}
+                <TouchableWithoutFeedback>
+                  <View style={styles.forgotPasswordContainer}>
+                    <ThemedText style={styles.forgotPasswordText}>
+                      Forgot Password?
+                    </ThemedText>
+                  </View>
+                </TouchableWithoutFeedback>
+
+                <Spacer height={20} />
+
+                {/* Login Button */}
+                <ThemedButton
+                  onPress={handleSubmit}
+                  disabled={isLoading}
+                  style={[
+                    styles.loginButton,
+                    isLoading && styles.loginButtonDisabled,
+                  ]}>
+                  {isLoading ? (
+                    <ThemedLoader size='small' color='#f2f2f2' />
+                  ) : (
+                    <Text style={styles.loginButtonText}>Login</Text>
+                  )}
+                </ThemedButton>
+
+                <Spacer height={30} />
+
+                {/* Access Info */}
+                <Spacer height={20} />
+                <View style={styles.infoContainer}>
+                  <ThemedText style={styles.infoText}>
+                    ℹ️ Access limited to vehicle owners and managers only
+                  </ThemedText>
+                </View>
+              </View>
+            </ThemedView>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
     </SafeAreaView>
   );
 };

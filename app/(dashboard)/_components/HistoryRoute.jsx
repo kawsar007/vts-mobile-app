@@ -15,6 +15,7 @@ const ArrowMarker = ({ bearing }) => (
         size={24}
         color='#FFFFFF'
       />
+      {/* <MaterialCommunityIcons name='arrow-up-bold' size={20} color='#22c55e' /> */}
     </View>
   </View>
 );

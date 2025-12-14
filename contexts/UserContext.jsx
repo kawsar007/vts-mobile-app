@@ -1,11 +1,13 @@
 import { createContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 export const UserContext = createContext();
+import { useRouter } from "expo-router";
 
 const API_URL = "http://69.167.170.135/api/auth/signin";
 const VALIDATE_TOKEN_URL = "http://69.167.170.135/api/auth/verify-token";
 
 export function UserProvider({ children }) {
+  const router = useRouter();
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
 
