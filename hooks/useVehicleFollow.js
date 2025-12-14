@@ -11,12 +11,12 @@ export const useVehicleFollow = (mapRef) => {
   const lastLocationRef = useRef(null);
 
   const fetchLastLocation = useCallback(async (vehiclePlate) => {
-    console.log("Selected Follow Vehicle:--->", vehiclePlate);
-    
+
     try {
       const response = await fetch(`${API_BASE}/location/last?vehicles=${vehiclePlate}`);
       const data = await response.json();
-      console.log("Last Location Data:--->", data.data);
+      console.log("Response Data:===>", data.data);
+
       if (data?.data && data?.data?.length > 0) {
         const location = data?.data[0];
         const lat = parseFloat(location.latitude);
@@ -29,6 +29,13 @@ export const useVehicleFollow = (mapRef) => {
             speed: location.speed,
             engine: location.engine,
             time: location.time,
+            ac: location.ac,
+            batt_level: location.batt_level,
+            fuel: location.fuel,
+            network_strength: location.network_strength,
+            satellite: location.satellite,
+            temp: location.temp,
+            data_status: location["data-status"]
           }
         }
 
@@ -137,9 +144,10 @@ export const useVehicleFollow = (mapRef) => {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+
+    setIsFollowing(false);
     setFollowingVehicle(null);
     setFollowPath([]);
-    setIsFollowing(false);
     lastLocationRef.current = null;
   }, []);
 

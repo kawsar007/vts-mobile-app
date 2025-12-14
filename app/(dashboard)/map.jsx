@@ -36,6 +36,7 @@ import { calculateBearing } from "../../helper/calculateBearing";
 import HistoryRoute from "./_components/HistoryRoute";
 import { useVehicleFollow } from "../../hooks/useVehicleFollow";
 import FollowPath from "./_components/FollowPath";
+import FollowTopCard from "./_components/FollowTopCard";
 
 const { height } = Dimensions.get("window");
 
@@ -85,6 +86,8 @@ export default function GoogleMap({
     startFollowing,
     stopFollowing,
   } = useVehicleFollow(mapRef);
+
+  console.log("Follow Path:--->", followPath);
 
   const initialRegion = useMemo(
     () => ({
@@ -137,6 +140,18 @@ export default function GoogleMap({
       return () => clearTimeout(timer);
     }
   }, [validLocations, mapReady, isHistoryActive, isFollowing]);
+
+  // Re-render markers when follow mode ends
+  useEffect(() => {
+    if (!isFollowing && !isHistoryActive && locations.length > 0) {
+      setMarkersRendered(false);
+      const timer = setTimeout(() => {
+        setMarkersRendered(true);
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [isFollowing, isHistoryActive, locations.length]);
 
   useEffect(() => {
     if (locations.length && mapReady) {
@@ -280,7 +295,7 @@ export default function GoogleMap({
       )}
 
       {/* Top Card */}
-      <View
+      {/* <View
         style={[
           styles.topCard,
           {
@@ -288,31 +303,51 @@ export default function GoogleMap({
               ? "rgba(26, 26, 26, 0.95)"
               : "rgba(255, 255, 255, 0.95)",
           },
-        ]}>
-        <View style={styles.topCardRow}>
-          <View style={styles.statItem}>
-            <MaterialCommunityIcons
-              name='truck-check'
-              size={20}
-              color={theme.iconColorFocused}
-            />
-            <ThemedText style={styles.statValue}>
-              {validLocations.length}/{vehicles.length}
-            </ThemedText>
-            <ThemedText style={styles.statLabel}>On Map</ThemedText>
-          </View>
-          <View style={styles.statItem}>
-            <MaterialCommunityIcons name='engine' size={20} color='#22c55e' />
-            <ThemedText style={styles.statValue}>{stats.running}</ThemedText>
-            <ThemedText style={styles.statLabel}>Running</ThemedText>
-          </View>
-          <View style={styles.statItem}>
-            <MaterialCommunityIcons name='stop' size={20} color='#ef4444' />
-            <ThemedText style={styles.statValue}>{stats.stopped}</ThemedText>
-            <ThemedText style={styles.statLabel}>Stopped</ThemedText>
+        ]}> */}
+      {isFollowing && followPath.length > 0 ? (
+        <FollowTopCard
+          followingVehicle={followingVehicle}
+          followPath={followPath}
+          isDark={isDark}
+          theme={theme}
+          formatTime={formatTime}
+        />
+      ) : (
+        <View
+          style={[
+            styles.topCard,
+            {
+              backgroundColor: isDark
+                ? "rgba(26, 26, 26, 0.95)"
+                : "rgba(255, 255, 255, 0.95)",
+            },
+          ]}>
+          <View style={styles.topCardRow}>
+            <View style={styles.statItem}>
+              <MaterialCommunityIcons
+                name='truck-check'
+                size={20}
+                color={theme.iconColorFocused}
+              />
+              <ThemedText style={styles.statValue}>
+                {validLocations.length}/{vehicles.length}
+              </ThemedText>
+              <ThemedText style={styles.statLabel}>On Map</ThemedText>
+            </View>
+            <View style={styles.statItem}>
+              <MaterialCommunityIcons name='engine' size={20} color='#22c55e' />
+              <ThemedText style={styles.statValue}>{stats.running}</ThemedText>
+              <ThemedText style={styles.statLabel}>Running</ThemedText>
+            </View>
+            <View style={styles.statItem}>
+              <MaterialCommunityIcons name='stop' size={20} color='#ef4444' />
+              <ThemedText style={styles.statValue}>{stats.stopped}</ThemedText>
+              <ThemedText style={styles.statLabel}>Stopped</ThemedText>
+            </View>
           </View>
         </View>
-      </View>
+      )}
+      {/* </View> */}
 
       <TouchableOpacity
         style={[styles.refreshBtn, { backgroundColor: theme.iconColorFocused }]}

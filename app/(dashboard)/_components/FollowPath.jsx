@@ -40,7 +40,7 @@ export default function FollowPath({ path, isActive }) {
               <MaterialCommunityIcons
                 name='arrow-up-bold'
                 size={20}
-                color='#6366f1'
+                color='#22c55e'
               />
             </View>
           </Marker>,
