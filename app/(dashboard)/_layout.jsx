@@ -31,10 +31,11 @@ const { width, height } = Dimensions.get("window");
 const DRAWER_WIDTH = width * 0.75;
 
 export default function DashboardLayout() {
-  const { logout, user, validateToken } = useUser();
+  const { logout, user, validateToken, getAuthToken } = useUser();
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme] ?? Colors.light;
   const isDark = colorScheme === "dark";
+  const [authToken, setAuthToken] = useState(null)
 
 //   useEffect(() => {
 // logout()
@@ -52,6 +53,15 @@ export default function DashboardLayout() {
   const [notifAnim] = useState(new Animated.Value(width));
 
   const inactiveColor = isDark ? "#6b7280" : "#9ca3af";
+
+  useEffect(() => {
+    async function loadToken() {
+      const token = await getAuthToken();
+      setAuthToken(token)
+    }
+
+    loadToken();
+  }, []);
 
   // Token validation on app state change (when app comes to foreground)
   useEffect(() => {
@@ -96,6 +106,8 @@ export default function DashboardLayout() {
 
   const toggleSideNav = () => setShowSideNav(!showSideNav);
   const toggleNotifications = () => setShowNotifications(!showNotifications);
+
+  console.log("Auth Token:=====---===>", authToken);
 
   return (
     <UserOnly>
@@ -204,6 +216,7 @@ export default function DashboardLayout() {
           onClose={() => setShowNotifications(false)}
           animValue={notifAnim}
           isDark={isDark}
+          authToken={authToken}
         />
       </SafeAreaView>
     </UserOnly>

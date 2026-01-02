@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -5,50 +6,102 @@ import {
   StyleSheet,
   Modal,
   Dimensions,
-  StatusBar,
-  Alert,
-  Platform,
   Animated,
   TouchableWithoutFeedback,
   ScrollView,
+  ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-const { width, height } = Dimensions.get("window");
+import { useNotifications } from "../../hooks/useNotification";
+
+const { width } = Dimensions.get("window");
 const DRAWER_WIDTH = width * 0.75;
 
-export const NotificationDrawer = ({ visible, onClose, animValue, isDark }) => {
-  if (!visible) return null;
+// Helper function to format notification time
+const formatTime = (dateString) => {
+  if (!dateString) return "";
 
-  // Sample notifications - replace with real data
-  const notifications = [
-    {
-      id: 1,
-      title: "Vehicle Alert",
-      message: "Vehicle ABC-123 exceeded speed limit",
-      time: "5 min ago",
-      unread: true,
-      icon: "warning",
-      iconColor: "#f59e0b",
-    },
-    {
-      id: 2,
-      title: "Maintenance Due",
-      message: "Vehicle XYZ-789 is due for service",
-      time: "1 hour ago",
-      unread: true,
-      icon: "construct",
-      iconColor: "#3b82f6",
-    },
-    {
-      id: 3,
-      title: "Trip Completed",
-      message: "Driver John completed route #45",
-      time: "2 hours ago",
-      unread: false,
-      icon: "checkmark-circle",
-      iconColor: "#10b981",
-    },
-  ];
+  const now = new Date();
+  const date = new Date(dateString);
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins} min ago`;
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+  if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+
+  return date.toLocaleDateString();
+};
+
+// Helper function to map notification types to icons and colors
+const getNotificationStyle = (type) => {
+  const styles = {
+    alert: { icon: "warning", color: "#f59e0b" },
+    warning: { icon: "warning", color: "#f59e0b" },
+    maintenance: { icon: "construct", color: "#3b82f6" },
+    service: { icon: "construct", color: "#3b82f6" },
+    success: { icon: "checkmark-circle", color: "#10b981" },
+    completed: { icon: "checkmark-circle", color: "#10b981" },
+    info: { icon: "information-circle", color: "#3b82f6" },
+    error: { icon: "close-circle", color: "#ef4444" },
+    default: { icon: "notifications", color: "#6b7280" },
+  };
+
+  return styles[type?.toLowerCase()] || styles.default;
+};
+
+export const NotificationDrawer = ({
+  visible,
+  onClose,
+  animValue,
+  isDark,
+  authToken, // Pass authToken as prop
+}) => {
+  const {
+    notifications,
+    counts,
+    loading,
+    loadingAction,
+    fetchNotifications,
+    markAsSeen,
+    markAllAsSeen,
+  } = useNotifications(authToken);
+
+  console.log("Notification & Count:--->", {
+    notifications,
+    counts,
+  });
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchNotifications();
+    setRefreshing(false);
+  };
+
+  const handleNotificationPress = async (notification) => {
+    // Mark as seen if not already seen
+    if (!notification.is_seen) {
+      await markAsSeen([notification.id]);
+    }
+
+    // Add your navigation logic here
+    // For example: navigate to vehicle details, trip details, etc.
+    console.log("Notification pressed:", notification);
+  };
+
+  const handleMarkAllAsRead = async () => {
+    if (counts.unseen > 0) {
+      await markAllAsSeen();
+    }
+  };
+
+  if (!visible) return null;
 
   return (
     <Modal
@@ -73,13 +126,22 @@ export const NotificationDrawer = ({ visible, onClose, animValue, isDark }) => {
                   styles.notifHeader,
                   { borderBottomColor: isDark ? "#333" : "#e5e7eb" },
                 ]}>
-                <Text
-                  style={[
-                    styles.notifTitle,
-                    { color: isDark ? "#fff" : "#000" },
-                  ]}>
-                  Notifications
-                </Text>
+                <View style={styles.headerLeft}>
+                  <Text
+                    style={[
+                      styles.notifTitle,
+                      { color: isDark ? "#fff" : "#000" },
+                    ]}>
+                    Notifications
+                  </Text>
+                  {counts.unseen > 0 && (
+                    <View style={styles.unseenBadge}>
+                      <Text style={styles.unseenBadgeText}>
+                        {counts.unseen > 99 ? "99+" : counts.unseen}
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 <TouchableOpacity onPress={onClose}>
                   <Ionicons
                     name='close'
@@ -90,78 +152,119 @@ export const NotificationDrawer = ({ visible, onClose, animValue, isDark }) => {
               </View>
 
               {/* Notifications List */}
-              <ScrollView style={styles.notifList}>
-                {notifications.length === 0 ? (
-                  <View style={styles.emptyState}>
-                    <Ionicons
-                      name='notifications-off-outline'
-                      size={64}
-                      color={isDark ? "#374151" : "#d1d5db"}
+              {loading && notifications.length === 0 ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size='large' color='#3b82f6' />
+                  <Text
+                    style={[
+                      styles.loadingText,
+                      { color: isDark ? "#9ca3af" : "#6b7280" },
+                    ]}>
+                    Loading notifications...
+                  </Text>
+                </View>
+              ) : (
+                <ScrollView
+                  style={styles.notifList}
+                  refreshControl={
+                    <RefreshControl
+                      refreshing={refreshing}
+                      onRefresh={onRefresh}
+                      tintColor={isDark ? "#fff" : "#000"}
                     />
-                    <Text
-                      style={[
-                        styles.emptyText,
-                        { color: isDark ? "#6b7280" : "#9ca3af" },
-                      ]}>
-                      No notifications yet
-                    </Text>
-                  </View>
-                ) : (
-                  notifications.map((notif) => (
-                    <TouchableOpacity
-                      key={notif.id}
-                      style={[
-                        styles.notifItem,
-                        {
-                          backgroundColor: notif.unread
-                            ? isDark
-                              ? "#1f2937"
-                              : "#f3f4f6"
-                            : "transparent",
-                          borderBottomColor: isDark ? "#333" : "#e5e7eb",
-                        },
-                      ]}>
-                      <View
+                  }>
+                  {notifications.length === 0 ? (
+                    <View style={styles.emptyState}>
+                      <Ionicons
+                        name='notifications-off-outline'
+                        size={64}
+                        color={isDark ? "#374151" : "#d1d5db"}
+                      />
+                      <Text
                         style={[
-                          styles.notifIcon,
-                          { backgroundColor: `${notif.iconColor}20` },
+                          styles.emptyText,
+                          { color: isDark ? "#6b7280" : "#9ca3af" },
                         ]}>
-                        <Ionicons
-                          name={notif.icon}
-                          size={24}
-                          color={notif.iconColor}
-                        />
-                      </View>
-                      <View style={styles.notifContent}>
-                        <View style={styles.notifTitleRow}>
-                          <Text
+                        No notifications yet
+                      </Text>
+                    </View>
+                  ) : (
+                    notifications.map((notif) => {
+                      const notifStyle = getNotificationStyle(
+                        notif.type || notif.notification_type,
+                      );
+
+                      return (
+                        <TouchableOpacity
+                          key={notif.id}
+                          style={[
+                            styles.notifItem,
+                            {
+                              backgroundColor: !notif.is_seen
+                                ? isDark
+                                  ? "#1f2937"
+                                  : "#f3f4f6"
+                                : "transparent",
+                              borderBottomColor: isDark ? "#333" : "#e5e7eb",
+                            },
+                          ]}
+                          onPress={() => handleNotificationPress(notif)}>
+                          <View
                             style={[
-                              styles.notifItemTitle,
-                              { color: isDark ? "#fff" : "#000" },
+                              styles.notifIcon,
+                              { backgroundColor: `${notifStyle.color}20` },
                             ]}>
-                            {notif.title}
-                          </Text>
-                          {notif.unread && <View style={styles.unreadBadge} />}
-                        </View>
-                        <Text
-                          style={[
-                            styles.notifMessage,
-                            { color: isDark ? "#9ca3af" : "#6b7280" },
-                          ]}>
-                          {notif.message}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.notifTime,
-                            { color: isDark ? "#6b7280" : "#9ca3af" },
-                          ]}>
-                          {notif.time}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))
-                )}
-              </ScrollView>
+                            <Ionicons
+                              name={notifStyle.icon}
+                              size={24}
+                              color={notifStyle.color}
+                            />
+                          </View>
+                          <View style={styles.notifContent}>
+                            <View style={styles.notifTitleRow}>
+                              <Text
+                                style={[
+                                  styles.notifItemTitle,
+                                  { color: isDark ? "#fff" : "#000" },
+                                ]}
+                                numberOfLines={1}>
+                                {notif.title}
+                              </Text>
+                              {!notif.is_seen && (
+                                <View style={styles.unreadBadge} />
+                              )}
+                            </View>
+                            <Text
+                              style={[
+                                styles.notifMessage,
+                                { color: isDark ? "#9ca3af" : "#6b7280" },
+                              ]}
+                              numberOfLines={2}>
+                              {notif.message || notif.body}
+                            </Text>
+                            {notif.number_plate && (
+                              <Text
+                                style={[
+                                  styles.notifVehicle,
+                                  { color: isDark ? "#60a5fa" : "#3b82f6" },
+                                ]}>
+                                Vehicle: {notif.number_plate}
+                              </Text>
+                            )}
+                            <Text
+                              style={[
+                                styles.notifTime,
+                                { color: isDark ? "#6b7280" : "#9ca3af" },
+                              ]}>
+                              {formatTime(notif.created_at)}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })
+                  )}
+                </ScrollView>
+              )}
 
               {/* Footer Actions */}
               {notifications.length > 0 && (
@@ -170,11 +273,23 @@ export const NotificationDrawer = ({ visible, onClose, animValue, isDark }) => {
                     styles.notifFooter,
                     { borderTopColor: isDark ? "#333" : "#e5e7eb" },
                   ]}>
-                  <TouchableOpacity style={styles.footerButton}>
-                    <Text
-                      style={[styles.footerButtonText, { color: "#3b82f6" }]}>
-                      Mark all as read
-                    </Text>
+                  <TouchableOpacity
+                    style={styles.footerButton}
+                    onPress={handleMarkAllAsRead}
+                    disabled={loadingAction || counts.unseen === 0}>
+                    {loadingAction ? (
+                      <ActivityIndicator size='small' color='#3b82f6' />
+                    ) : (
+                      <Text
+                        style={[
+                          styles.footerButtonText,
+                          {
+                            color: counts.unseen === 0 ? "#9ca3af" : "#3b82f6",
+                          },
+                        ]}>
+                        Mark all as read
+                      </Text>
+                    )}
                   </TouchableOpacity>
                 </View>
               )}
@@ -187,12 +302,10 @@ export const NotificationDrawer = ({ visible, onClose, animValue, isDark }) => {
 };
 
 const styles = StyleSheet.create({
-  // Overlay
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
-
   notifDrawer: {
     position: "absolute",
     right: 0,
@@ -212,9 +325,37 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
   },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   notifTitle: {
     fontSize: 20,
     fontWeight: "700",
+  },
+  unseenBadge: {
+    backgroundColor: "#ef4444",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    minWidth: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  unseenBadgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
   },
   notifList: {
     flex: 1,
@@ -254,6 +395,7 @@ const styles = StyleSheet.create({
   notifItemTitle: {
     fontSize: 16,
     fontWeight: "600",
+    flex: 1,
   },
   unreadBadge: {
     width: 8,
@@ -263,6 +405,12 @@ const styles = StyleSheet.create({
   },
   notifMessage: {
     fontSize: 14,
+    marginBottom: 4,
+    lineHeight: 20,
+  },
+  notifVehicle: {
+    fontSize: 13,
+    fontWeight: "500",
     marginBottom: 4,
   },
   notifTime: {
@@ -274,6 +422,7 @@ const styles = StyleSheet.create({
   },
   footerButton: {
     alignItems: "center",
+    paddingVertical: 4,
   },
   footerButtonText: {
     fontSize: 16,
