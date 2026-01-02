@@ -17,7 +17,6 @@ import {
   Alert,
   StyleSheet,
   Dimensions,
-  RefreshControl
 } from "react-native";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
