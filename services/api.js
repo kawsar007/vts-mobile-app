@@ -1,6 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
-const BASE_URL = process.env.EXPO_PUBLIC_BASE_URL;
+const BASE_URL = Constants.expoConfig?.extra?.baseUrl;
+const googleMapApiKey = Constants.expoConfig?.extra?.googleMapApiKey;
+
+console.log('Base URL:', baseUrl);
+
+// const BASE_URL = process.env.EXPO_PUBLIC_BASE_URL;
 
 class ApiService {
   constructor() {
