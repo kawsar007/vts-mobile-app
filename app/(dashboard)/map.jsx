@@ -17,6 +17,7 @@ import {
   Alert,
   StyleSheet,
   Dimensions,
+  RefreshControl
 } from "react-native";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -352,7 +353,8 @@ export default function GoogleMap({
       <TouchableOpacity
         style={[styles.refreshBtn, { backgroundColor: theme.iconColorFocused }]}
         onPress={refresh}
-        disabled={locationsLoading}>
+        disabled={locationsLoading}
+        >
         {locationsLoading ? (
           <ActivityIndicator size='small' color='#fff' />
         ) : (
