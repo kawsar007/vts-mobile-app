@@ -1,10 +1,10 @@
-import { createContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-export const UserContext = createContext();
 import { useRouter } from "expo-router";
+import { createContext, useEffect, useState } from "react";
+export const UserContext = createContext();
 
-const API_URL = "http://69.167.170.135/api/auth/signin";
-const VALIDATE_TOKEN_URL = "http://69.167.170.135/api/auth/verify-token";
+const API_URL = "https://187.77.155.149/api/auth/signin";
+const VALIDATE_TOKEN_URL = "https://187.77.155.149/api/auth/verify-token";
 
 export function UserProvider({ children }) {
   const router = useRouter();
@@ -15,6 +15,9 @@ export function UserProvider({ children }) {
   const ALLOWED_ROLES = ["vehicle_owner", "manager"];
 
   async function login(username, password) {
+    console.log("Username:--->", username);
+    console.log("UserPass:--->", password);
+    
     try {
       const response = await fetch(API_URL, {
         method: "POST",

@@ -1,32 +1,28 @@
 // app/(dashboard)/layout.js
-import React, { useState, useEffect } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
+import { useEffect, useState } from "react";
 import {
-  View,
+  Alert,
+  Animated,
+  AppState,
+  Dimensions,
+  Platform,
+  StatusBar,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  Modal,
-  Dimensions,
-  StatusBar,
-  Alert,
-  Platform,
-  Animated,
-  TouchableWithoutFeedback,
-  ScrollView,
-  AppState,
+  useColorScheme,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useColorScheme } from "react-native";
-import { Colors } from "../../constants/Colors";
-import { Ionicons } from "@expo/vector-icons";
-import AntDesign from "@expo/vector-icons/AntDesign";
-import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import UserOnly from "../../components/auth/UserOnly";
-import { useUser } from "../../hooks/useUser";
-import GoogleMap from "./map";
 import { NotificationDrawer } from "../../components/layout/NotificationDrawer";
 import { SideNavigationDrawer } from "../../components/layout/SideNavDrawer";
+import { Colors } from "../../constants/Colors";
 import { useNotifications } from "../../hooks/useNotification";
+import { useUser } from "../../hooks/useUser";
+import GoogleMap from "./map";
 
 const { width, height } = Dimensions.get("window");
 const DRAWER_WIDTH = width * 0.75;
@@ -137,7 +133,7 @@ export default function DashboardLayout() {
             <Ionicons name='menu' size={28} color={isDark ? "#fff" : "#000"} />
           </TouchableOpacity>
           <Text style={[styles.appTitle, { color: isDark ? "#fff" : "#000" }]}>
-            GeonVTS
+            Oton GPS
           </Text>
           <TouchableOpacity
             style={styles.notificationButton}

@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import { useCallback, useEffect, useState } from "react";
 
 // Configure your API base URL
-const API_BASE = "http://69.167.170.135/api/"; // Replace with your actual API URL
+const API_BASE = "https://187.77.155.149/api/"; // Replace with your actual API URL
 
 export const useNotifications = (authToken) => {
   console.log("Auth Token:--->", authToken);
