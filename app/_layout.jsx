@@ -1,8 +1,7 @@
-import { StyleSheet, Text, View, useColorScheme } from "react-native";
-import React from "react";
 import { Stack } from "expo-router";
-import { Colors } from "../constants/Colors";
 import { StatusBar } from "expo-status-bar";
+import { StyleSheet, useColorScheme } from "react-native";
+import { Colors } from "../constants/Colors";
 import { UserProvider } from "../contexts/UserContext";
 
 const RootLayout = () => {
@@ -19,7 +18,8 @@ const RootLayout = () => {
         }}>
         <Stack.Screen name='(auth)' options={{ headerShown: false }} />
         <Stack.Screen name='(dashboard)' options={{ headerShown: false }} />
-        <Stack.Screen name='index' options={{ title: "Home" }} />
+        {/* <Stack.Screen name='index' options={{ title: "Home" }} /> */}
+        <Stack.Screen name='index' options={{ headerShown: false }} />
       </Stack>
     </UserProvider>
   );
