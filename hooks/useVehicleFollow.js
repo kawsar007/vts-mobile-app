@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-const API_BASE = 'http://187.77.155.149/api';
+const API_BASE = 'https://187.77.155.149/api';
 const POLLING_INTERVAL = 10000;
 
 export const useVehicleFollow = (mapRef) => {

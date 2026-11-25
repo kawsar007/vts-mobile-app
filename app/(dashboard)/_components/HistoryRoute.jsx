@@ -1,8 +1,8 @@
 // app/(dashboard)/_components/HistoryRoute.jsx
-import React, { useEffect, useRef, useMemo, useState } from "react";
-import { Polyline, Marker } from "react-native-maps";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { View, StyleSheet } from "react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { StyleSheet, View } from "react-native";
+import { Marker, Polyline } from "react-native-maps";
 import { calculateBearing } from "../../../helper/calculateBearing";
 // import simplify from 'simplify-js'; // Optional: Install via `expo install simplify-js` for path reduction
 

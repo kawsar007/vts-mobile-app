@@ -1,44 +1,103 @@
 // app/(dashboard)/map.js
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Location from "expo-location";
 import React, {
-  useState,
-  useEffect,
-  useRef,
-  useMemo,
   useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import {
-  View,
   ActivityIndicator,
-  TouchableOpacity,
-  Modal,
-  Text,
-  ScrollView,
-  FlatList,
-  Alert,
-  StyleSheet,
   Dimensions,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useColorScheme,
+  View
 } from "react-native";
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import ThemedView from "../../components/ThemedView";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import ThemedText from "../../components/ThemedText";
-import { useVehicles } from "../../hooks/useVehicles";
-import { useVehicleLocations } from "../../hooks/useVehicleLocations";
-import { useColorScheme } from "react-native";
+import ThemedView from "../../components/ThemedView";
 import { Colors } from "../../constants/Colors";
-import DateTimePicker from "@react-native-community/datetimepicker";
-import { Picker } from "@react-native-picker/picker";
-import VehicleListModal from "./_components/VehicleListModal";
-import HistoryModal from "./_components/HistoryModal";
-import { useVehicleHistory } from "../../hooks/useVehicleHistory";
-import InfoRow from "./_components/InfoRow";
-import { calculateBearing } from "../../helper/calculateBearing";
-import HistoryRoute from "./_components/HistoryRoute";
 import { useVehicleFollow } from "../../hooks/useVehicleFollow";
+import { useVehicleHistory } from "../../hooks/useVehicleHistory";
+import { useVehicleLocations } from "../../hooks/useVehicleLocations";
+import { useVehicles } from "../../hooks/useVehicles";
 import FollowPath from "./_components/FollowPath";
 import FollowTopCard from "./_components/FollowTopCard";
+import HistoryModal from "./_components/HistoryModal";
+import HistoryRoute from "./_components/HistoryRoute";
+import InfoRow from "./_components/InfoRow";
+import VehicleListModal from "./_components/VehicleListModal";
 
 const { height } = Dimensions.get("window");
+
+// Module-level (outside the component, so it survives re-renders and
+// remounts of this screen) cache for reverse-geocoding results. Keyed by
+// coordinates rounded to ~11m precision so nearby re-reads of the same
+// vehicle don't re-hit the geocoder, and so re-opening the same vehicle's
+// modal is instant on the second look.
+const addressCache = new Map();
+const addressCacheKey = (lat, lng) =>
+  `${lat.toFixed(4)},${lng.toFixed(4)}`;
+
+// Builds a soft, low-opacity tint behind a stat icon. Only tries to append
+// an alpha suffix when `color` is a plain 6-digit hex (the normal case for
+// theme/icon colors here); anything else (named color, rgba(...), etc.)
+// falls back to a neutral tint so the chip never ends up fully opaque.
+const tint = (color, hexAlpha = "1F", fallback = "rgba(100,116,139,0.12)") =>
+  typeof color === "string" && /^#[0-9a-fA-F]{6}$/.test(color)
+    ? `${color}${hexAlpha}`
+    : fallback;
+
+const formatAddress = (result) => {
+  if (!result) return null;
+  const { name, street, district, city, subregion, region, country } =
+    result;
+  // Build a short, readable address from whichever parts the platform
+  // geocoder actually returned (coverage varies by area/country).
+  const parts = [
+    street || name,
+    district,
+    city || subregion,
+    region,
+    country,
+  ].filter(Boolean);
+  // De-dupe consecutive identical parts (e.g. city === subregion)
+  const deduped = parts.filter((p, i) => p !== parts[i - 1]);
+  return deduped.length ? deduped.join(", ") : null;
+};
+
+// Memoized marker visual so a poll tick that doesn't change a vehicle's
+// position/engine state does not force react-native-maps to tear down and
+// re-create that marker's native view. This is what keeps a large fleet
+// (hundreds of markers) from hammering the native bridge on every refresh.
+const VehicleMarkerIcon = React.memo(function VehicleMarkerIcon({ running }) {
+  return (
+    <View style={styles.markerContainer}>
+      <View
+        style={[
+          styles.markerInner,
+          { backgroundColor: running ? "#22c55e" : "#ef4444" },
+        ]}>
+        <MaterialCommunityIcons
+          name={running ? "truck-fast" : "truck"}
+          size={20}
+          color='#fff'
+        />
+      </View>
+      {!running && (
+        <View style={styles.stopBadge}>
+          <MaterialCommunityIcons name='stop' size={10} color='#fff' />
+        </View>
+      )}
+    </View>
+  );
+});
 
 export default function GoogleMap({
   showVehicles,
@@ -55,6 +114,17 @@ export default function GoogleMap({
   const [markersRendered, setMarkersRendered] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [currentRegion, setCurrentRegion] = useState(null);
+
+  // Reverse geocoding for the Location Details section of the vehicle
+  // modal: { address, loading, error }. Resolved from the selected
+  // vehicle's own coordinates, not from all vehicles on the map, so this
+  // never scales with fleet size.
+  const [addressState, setAddressState] = useState({
+    address: null,
+    loading: false,
+    error: false,
+  });
+  const locationPermissionRef = useRef(null); // caches the permission check across opens
 
   // History states
   const [selectedPlate, setSelectedPlate] = useState("");
@@ -87,8 +157,6 @@ export default function GoogleMap({
     stopFollowing,
   } = useVehicleFollow(mapRef);
 
-  console.log("Follow Path:--->", followPath);
-
   const initialRegion = useMemo(
     () => ({
       latitude: 23.8103,
@@ -105,14 +173,37 @@ export default function GoogleMap({
     return Number(engine) === 1;
   }, []);
 
-  // FIX: Memoize valid coordinates
+  // ROOT CAUSE FIX #1
+  // `locations` can contain more than one record for the same vehicle
+  // (e.g. an in-flight poll result overlapping a new one, or the backend
+  // emitting a stale + fresh row for the same plate before the hook settles).
+  // Rendering two <Marker> siblings with the IDENTICAL `key` inside a
+  // react-native-maps <MapView> is what crashes the native layer once the
+  // fleet is large enough for this to actually happen during a render pass:
+  // the native view manager (especially on Android) throws trying to
+  // add/update a marker view it believes already exists under that key/tag,
+  // producing a hard native crash rather than a JS warning.
+  // De-duplicating by vehicle id BEFORE anything downstream touches the
+  // data guarantees every <Marker key=...> in this tree is unique.
+  const dedupedLocations = useMemo(() => {
+    const byVehicle = new Map();
+    for (const loc of locations) {
+      if (!loc || loc.vehicle === undefined || loc.vehicle === null) continue;
+      // last value wins, so the freshest record for a plate is kept
+      byVehicle.set(loc.vehicle, loc);
+    }
+    return Array.from(byVehicle.values());
+  }, [locations]);
+
+  // FIX: Memoize valid coordinates (now sourced from the deduped list so
+  // the marker list, the "on map" stats, and fitToCoordinates all agree)
   const validLocations = useMemo(() => {
-    return locations.filter((l) => {
+    return dedupedLocations.filter((l) => {
       const lat = parseFloat(l.latitude);
       const lng = parseFloat(l.longitude);
       return !isNaN(lat) && !isNaN(lng) && !(lat === 0 && lng === 0);
     });
-  }, [locations]);
+  }, [dedupedLocations]);
 
   // Fit live vehicles
   useEffect(() => {
@@ -153,12 +244,81 @@ export default function GoogleMap({
     }
   }, [isFollowing, isHistoryActive, locations.length]);
 
+  // Settle markers after the initial batch mounts.
+  // (Depends on validLocations.length rather than the whole `locations`
+  // array reference, so this effect doesn't re-run on every single poll
+  // tick just because the hook handed back a new array instance with the
+  // same vehicles in it — one more source of needless marker churn removed.)
   useEffect(() => {
-    if (locations.length && mapReady) {
+    if (validLocations.length && mapReady) {
       const t = setTimeout(() => setMarkersRendered(true), 1000);
       return () => clearTimeout(t);
     }
-  }, [locations, mapReady]);
+  }, [validLocations.length, mapReady]);
+
+  // Reverse geocode the selected vehicle's coordinates into a readable
+  // address whenever the vehicle modal opens (or the vehicle picked changes).
+  // Cancellation-safe via `cancelled` so a fast close/reopen can't let a
+  // stale response overwrite a newer one.
+  useEffect(() => {
+    if (!selectedVehicle) {
+      setAddressState({ address: null, loading: false, error: false });
+      return;
+    }
+
+    const lat = parseFloat(selectedVehicle.latitude);
+    const lng = parseFloat(selectedVehicle.longitude);
+    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
+      setAddressState({ address: null, loading: false, error: false });
+      return;
+    }
+
+    const key = addressCacheKey(lat, lng);
+    const cached = addressCache.get(key);
+    if (cached) {
+      setAddressState({ address: cached, loading: false, error: false });
+      return;
+    }
+
+    let cancelled = false;
+    setAddressState({ address: null, loading: true, error: false });
+
+    (async () => {
+      try {
+        if (locationPermissionRef.current === null) {
+          const { status } =
+            await Location.requestForegroundPermissionsAsync();
+          locationPermissionRef.current = status === "granted";
+        }
+        if (!locationPermissionRef.current) {
+          if (!cancelled)
+            setAddressState({ address: null, loading: false, error: true });
+          return;
+        }
+
+        const results = await Location.reverseGeocodeAsync({
+          latitude: lat,
+          longitude: lng,
+        });
+        const formatted = formatAddress(results?.[0]);
+
+        if (formatted) addressCache.set(key, formatted);
+        if (!cancelled)
+          setAddressState({
+            address: formatted,
+            loading: false,
+            error: !formatted,
+          });
+      } catch {
+        if (!cancelled)
+          setAddressState({ address: null, loading: false, error: true });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedVehicle?.vehicle, selectedVehicle?.latitude, selectedVehicle?.longitude]);
 
   // Memoized helpers
   const getVehicleDetails = useCallback(
@@ -196,13 +356,13 @@ export default function GoogleMap({
     [startFollowing],
   );
 
-  // Memoized marker rendering
+  // Memoized marker rendering (now reads from the de-duplicated,
+  // already-validated list, so there is no second parseFloat/NaN check
+  // disagreeing with validLocations)
   const renderMarker = useCallback(
     (loc) => {
       const lat = parseFloat(loc.latitude);
       const lng = parseFloat(loc.longitude);
-      if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return null;
-
       const running = isEngineRunning(loc.engine);
 
       return (
@@ -214,24 +374,7 @@ export default function GoogleMap({
             setSelectedVehicle({ ...loc, ...details });
           }}
           tracksViewChanges={!markersRendered}>
-          <View style={styles.markerContainer}>
-            <View
-              style={[
-                styles.markerInner,
-                { backgroundColor: running ? "#22c55e" : "#ef4444" },
-              ]}>
-              <MaterialCommunityIcons
-                name={running ? "truck-fast" : "truck"}
-                size={20}
-                color='#fff'
-              />
-            </View>
-            {!running && (
-              <View style={styles.stopBadge}>
-                <MaterialCommunityIcons name='stop' size={10} color='#fff' />
-              </View>
-            )}
-          </View>
+          <VehicleMarkerIcon running={running} />
         </Marker>
       );
     },
@@ -251,6 +394,19 @@ export default function GoogleMap({
     const stopped = validLocations.length - running;
     return { running, stopped };
   }, [validLocations, isEngineRunning]);
+
+  // ROOT CAUSE FIX #2
+  // `followPath` (and `history`) are only safe to hand to native map
+  // children (<FollowPath>/<Polyline>, <HistoryRoute>) and to `.length`
+  // checks once they're guaranteed to be arrays. If useVehicleFollow /
+  // useVehicleHistory ever initialize these as `null`/`undefined` (e.g.
+  // before the first path point arrives after `startFollowing` is called),
+  // `followPath.length` or handing `undefined` coordinates to a native
+  // Polyline throws and crashes the screen. Defaulting defensively here
+  // costs nothing and can't change behavior when the hooks already return
+  // arrays.
+  const safeFollowPath = Array.isArray(followPath) ? followPath : [];
+  const safeHistory = Array.isArray(history) ? history : [];
 
   if (vehiclesLoading) {
     return (
@@ -276,14 +432,14 @@ export default function GoogleMap({
         showsCompass
         loadingEnabled
         onRegionChangeComplete={handleRegionChangeComplete}>
-        {!isHistoryActive && !isFollowing && locations.map(renderMarker)}
+        {!isHistoryActive && !isFollowing && validLocations.map(renderMarker)}
         <HistoryRoute
-          history={history}
+          history={safeHistory}
           mapRef={mapRef}
           isHistoryActive={isHistoryActive}
           currentRegion={currentRegion}
         />
-        <FollowPath path={followPath} isActive={isFollowing} />
+        <FollowPath path={safeFollowPath} isActive={isFollowing} />
       </MapView>
 
       {/* Loading Overlay */}
@@ -294,20 +450,10 @@ export default function GoogleMap({
         </View>
       )}
 
-      {/* Top Card */}
-      {/* <View
-        style={[
-          styles.topCard,
-          {
-            backgroundColor: isDark
-              ? "rgba(26, 26, 26, 0.95)"
-              : "rgba(255, 255, 255, 0.95)",
-          },
-        ]}> */}
-      {isFollowing && followPath.length > 0 ? (
+      {isFollowing && safeFollowPath.length > 0 ? (
         <FollowTopCard
           followingVehicle={followingVehicle}
-          followPath={followPath}
+          followPath={safeFollowPath}
           isDark={isDark}
           theme={theme}
           formatTime={formatTime}
@@ -318,36 +464,66 @@ export default function GoogleMap({
             styles.topCard,
             {
               backgroundColor: isDark
-                ? "rgba(26, 26, 26, 0.95)"
-                : "rgba(255, 255, 255, 0.95)",
+                ? "rgba(23, 23, 26, 0.72)"
+                : "rgba(255, 255, 255, 0.78)",
+              borderColor: isDark
+                ? "rgba(255,255,255,0.08)"
+                : "rgba(15,23,42,0.06)",
             },
           ]}>
           <View style={styles.topCardRow}>
             <View style={styles.statItem}>
-              <MaterialCommunityIcons
-                name='truck-check'
-                size={20}
-                color={theme.iconColorFocused}
-              />
+              <View
+                style={[
+                  styles.statIconWrap,
+                  { backgroundColor: tint(theme.iconColorFocused) },
+                ]}>
+                <MaterialCommunityIcons
+                  name='truck-check'
+                  size={15}
+                  color={theme.iconColorFocused}
+                />
+              </View>
               <ThemedText style={styles.statValue}>
                 {validLocations.length}/{vehicles.length}
               </ThemedText>
-              <ThemedText style={styles.statLabel}>On Map</ThemedText>
+              <ThemedText style={styles.statLabel}>ON MAP</ThemedText>
             </View>
+
+            <View style={styles.statDivider} />
+
             <View style={styles.statItem}>
-              <MaterialCommunityIcons name='engine' size={20} color='#22c55e' />
+              <View
+                style={[
+                  styles.statIconWrap,
+                  { backgroundColor: tint("#22c55e") },
+                ]}>
+                <MaterialCommunityIcons
+                  name='engine'
+                  size={15}
+                  color='#22c55e'
+                />
+              </View>
               <ThemedText style={styles.statValue}>{stats.running}</ThemedText>
-              <ThemedText style={styles.statLabel}>Running</ThemedText>
+              <ThemedText style={styles.statLabel}>RUNNING</ThemedText>
             </View>
+
+            <View style={styles.statDivider} />
+
             <View style={styles.statItem}>
-              <MaterialCommunityIcons name='stop' size={20} color='#ef4444' />
+              <View
+                style={[
+                  styles.statIconWrap,
+                  { backgroundColor: tint("#ef4444") },
+                ]}>
+                <MaterialCommunityIcons name='stop' size={15} color='#ef4444' />
+              </View>
               <ThemedText style={styles.statValue}>{stats.stopped}</ThemedText>
-              <ThemedText style={styles.statLabel}>Stopped</ThemedText>
+              <ThemedText style={styles.statLabel}>STOPPED</ThemedText>
             </View>
           </View>
         </View>
       )}
-      {/* </View> */}
 
       <TouchableOpacity
         style={[styles.refreshBtn, { backgroundColor: theme.iconColorFocused }]}
@@ -468,16 +644,62 @@ export default function GoogleMap({
                 <ThemedText style={styles.sectionTitle}>
                   Location Details
                 </ThemedText>
+
+                {/* Reverse-geocoded, human-readable address. Loading and
+                    failure states are shown inline rather than blocking the
+                    rest of the modal, since the raw coordinates below still
+                    work regardless of geocoder availability. */}
+                <View style={styles.addressRow}>
+                  <View
+                    style={[
+                      styles.addressIconWrap,
+                      {
+                        backgroundColor: isDark
+                          ? "rgba(255,255,255,0.08)"
+                          : "rgba(15,23,42,0.06)",
+                      },
+                    ]}>
+                    <MaterialCommunityIcons
+                      name='map-marker-radius'
+                      size={16}
+                      color={theme.iconColorFocused}
+                    />
+                  </View>
+                  <View style={styles.addressTextWrap}>
+                    <ThemedText style={styles.addressLabel}>
+                      Address
+                    </ThemedText>
+                    {addressState.loading ? (
+                      <View style={styles.addressLoadingRow}>
+                        <ActivityIndicator
+                          size='small'
+                          color={theme.iconColorFocused}
+                        />
+                        <ThemedText style={styles.addressLoadingText}>
+                          Resolving location…
+                        </ThemedText>
+                      </View>
+                    ) : (
+                      <ThemedText style={styles.addressValue} numberOfLines={3}>
+                        {addressState.address ||
+                          (addressState.error
+                            ? "Address unavailable"
+                            : "N/A")}
+                      </ThemedText>
+                    )}
+                  </View>
+                </View>
+
                 <InfoRow
-                  icon='map-marker'
-                  label='Latitude'
-                  value={selectedVehicle?.latitude || "N/A"}
-                  isDark={isDark}
-                />
-                <InfoRow
-                  icon='map-marker'
-                  label='Longitude'
-                  value={selectedVehicle?.longitude || "N/A"}
+                  icon='crosshairs-gps'
+                  label='Coordinates'
+                  value={
+                    selectedVehicle?.latitude && selectedVehicle?.longitude
+                      ? `${Number(selectedVehicle.latitude).toFixed(5)}, ${Number(
+                          selectedVehicle.longitude,
+                        ).toFixed(5)}`
+                      : "N/A"
+                  }
                   isDark={isDark}
                 />
                 <InfoRow
@@ -529,7 +751,6 @@ export default function GoogleMap({
       </Modal>
 
       {/* Vehicles List Modal */}
-      {/* Vehicles Modal */}
       <Modal
         visible={showVehicles}
         transparent
@@ -610,18 +831,46 @@ const styles = StyleSheet.create({
     top: 16,
     left: 16,
     right: 16,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    // A subtle shadow instead of the previous heavy one keeps the card
+    // feeling like a light overlay rather than a solid panel sitting on
+    // top of the map.
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  topCardRow: { flexDirection: "row", justifyContent: "space-around" },
-  statItem: { alignItems: "center" },
-  statValue: { fontSize: 20, fontWeight: "700", marginTop: 4 },
-  statLabel: { fontSize: 11, opacity: 0.7, marginTop: 2 },
+  topCardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  statItem: { flex: 1, alignItems: "center", gap: 2 },
+  statIconWrap: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 2,
+  },
+  statValue: { fontSize: 15, fontWeight: "700", lineHeight: 18 },
+  statLabel: {
+    fontSize: 9.5,
+    fontWeight: "600",
+    opacity: 0.55,
+    letterSpacing: 0.4,
+  },
+  statDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 26,
+    backgroundColor: "rgba(128,128,128,0.25)",
+    marginHorizontal: 4,
+  },
   refreshBtn: {
     position: "absolute",
     bottom: 100,
@@ -700,8 +949,34 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   statusText: { color: "#fff", fontSize: 14, fontWeight: "700" },
-  infoSection: { marginBottom: 24 },
-  sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 12 },
+  infoSection: { marginBottom: 20 },
+  sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 10 },
+  addressRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    paddingVertical: 8,
+    marginBottom: 2,
+  },
+  addressIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 1,
+  },
+  addressTextWrap: { flex: 1 },
+  addressLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    opacity: 0.55,
+    letterSpacing: 0.3,
+    marginBottom: 2,
+  },
+  addressValue: { fontSize: 14, fontWeight: "500", lineHeight: 19 },
+  addressLoadingRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  addressLoadingText: { fontSize: 13, opacity: 0.6 },
   markerContainer: { position: "relative" },
   markerInner: {
     width: 40,
