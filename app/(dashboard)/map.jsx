@@ -148,6 +148,10 @@ export default function GoogleMap({
     isHistoryActive,
   } = useVehicleHistory();
 
+  console.log("History:--->", history);
+  console.log("Fetching History:--->", fetchHistory)
+  
+
   // Follow feature
   const {
     followingVehicle,

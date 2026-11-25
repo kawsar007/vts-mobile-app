@@ -1,13 +1,9 @@
-import { useState, useCallback } from 'react';
-import ApiService from "../services/api";
+import { useCallback, useState } from 'react';
 
 export const useVehicleHistory = () => {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  console.log("MY History:===>", history.length);
-
 
   const fetchHistory = useCallback(async (vehicleNumberPlate, startTime, endTime) => {
     if (!vehicleNumberPlate || !startTime || !endTime) {
@@ -27,7 +23,7 @@ export const useVehicleHistory = () => {
       const queryString = `vehicle=${encodeURIComponent(vehicleNumberPlate)}&start_time=${encodeURIComponent(formattedStart)}&end_time=${encodeURIComponent(formattedEnd)}`;
 
       const response = await fetch(
-        `http://69.167.170.135/api/location/history?${queryString}`
+        `https://187.77.155.149/api/location/history?${queryString}`
       );
       const data = await response.json();
       setHistory(data?.data || []);
